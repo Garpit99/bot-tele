@@ -30,13 +30,50 @@ module.exports = {
         ❓ HELP MENU 
   ============================ */
 async helpMenu(ctx) {
-  const help =
-    (await settingsService.getSetting('help')) ||
-    'Gunakan menu berikut untuk melihat produk, membeli, atau melacak pesanan.';
+  try {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
 
-  await ctx.reply(`❓ *Bantuan*\n\n${help}`, { parse_mode: 'Markdown' });
+    const help =
+      (await settingsService.getSetting('help')) ||
+      'Gunakan menu berikut untuk melihat produk, membeli, atau melacak pesanan.';
+
+    let helpVideos =
+      (await settingsService.getSetting('help_videos')) || null;
+
+    // Kirim teks bantuan dulu
+    await ctx.telegram.sendMessage(
+      ctx.chat.id,
+      `❓ *Bantuan*\n\n${help}`,
+      { parse_mode: 'Markdown' }
+    );
+
+    if (!helpVideos) return;
+
+    // =======================
+    // FIX ARRAY JSON PARSING
+    // =======================
+    try {
+      helpVideos = JSON.parse(helpVideos);
+      if (!Array.isArray(helpVideos)) helpVideos = [];
+    } catch {
+      helpVideos = [];
+    }
+
+    if (helpVideos.length === 0) return;
+
+    // pilih video acak agar dinamis
+    const randomFileId = helpVideos[Math.floor(Math.random() * helpVideos.length)];
+
+    // kirim videonya
+    await ctx.telegram.sendVideo(ctx.chat.id, randomFileId);
+
+  } catch (err) {
+    console.error("HELP MENU ERROR:", err);
+    await ctx.reply("❌ Gagal membuka menu bantuan.");
+  }
 },
-
 
   /* ============================
       🛒 VIEW PRODUCTS

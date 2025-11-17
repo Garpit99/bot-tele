@@ -2,6 +2,7 @@
 const productService = require('../../services/productService');
 const orderService = require('../../services/orderService');
 const settingsService = require('../../services/settingsService');
+const { link } = require('telegraf/format');
 
 // ------------------------------
 // Helper anti-spam untuk admin
@@ -92,27 +93,34 @@ async function handleState(ctx) {
        ADD PRODUCT
   ========================== */
   if (ctx.session.awaitingAddProduct) {
-    try {
-      const [id, name, price, stock, description] = text.split('|');
-      await productService.createProduct({
-        id: id.trim(),
-        name: name.trim(),
-        price: Number(price),
-        stock: Number(stock),
-        description: description.trim(),
-      });
+  try {
+    const [id, name, price, stock, description, links] = text.split('|');
 
-      await ctx.reply(
-        `✅ Produk *${name.trim()}* berhasil ditambahkan.`,
-        { parse_mode: 'Markdown' }
-      );
-    } catch (e) {
-      await ctx.reply('⚠️ Format salah! Gunakan: id|nama|harga|stok|deskripsi');
-    }
+    // Convert link menjadi array (support banyak link dipisah koma)
+    const linksArray = links
+      ? links.split(',').map(l => l.trim()).filter(l => l !== '')
+      : [];
 
-    ctx.session.awaitingAddProduct = false;
-    return;
+    await productService.createProduct({
+      id: id.trim(),
+      name: name.trim(),
+      price: Number(price),
+      stock: Number(stock),
+      description: description.trim(),
+      links: linksArray,        // ← Wajib array!
+    });
+
+    await ctx.reply(
+      `✅ Produk *${name.trim()}* berhasil ditambahkan.`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (e) {
+    await ctx.reply('⚠️ Format salah! Gunakan: id|nama|harga|stok|deskripsi|link1,link2');
   }
+
+  ctx.session.awaitingAddProduct = false;
+  return;
+}
 
   /* ==========================
        DELETE PRODUCT

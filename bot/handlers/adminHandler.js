@@ -10,6 +10,7 @@ async function showAdminMenu(ctx) {
   try {
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('➕ Tambah Produk', 'ADMIN_ADD_PRODUCT')],
+      [Markup.button.callback('✏️ Edit Produk', 'ADMIN_EDIT_PRODUCT')],
       [Markup.button.callback('❌ Hapus Produk', 'ADMIN_DELETE_PRODUCT')],
       [Markup.button.callback('📦 Daftar Order', 'ADMIN_LIST_ORDERS')],
       [Markup.button.callback('💳 Konfirmasi Pembayaran', 'ADMIN_CONFIRM_PAYMENT')],
@@ -18,6 +19,7 @@ async function showAdminMenu(ctx) {
       [Markup.button.callback('💬 Ubah Greeting', 'ADMIN_SET_GREETING')],
       [Markup.button.callback('💳 Ubah Rekening Pembayaran', 'ADMIN_SET_PAYMENT')],
       [Markup.button.callback('❓ Ubah Text Bantuan', 'ADMIN_SET_HELP')],
+      [Markup.button.callback('🎥 Upload Video Bantuan', 'ADMIN_UPLOAD_HELP_VIDEO')],
     ]);
 
     await ctx.reply('📋 *Panel Admin* — pilih aksi:', {
@@ -30,12 +32,90 @@ async function showAdminMenu(ctx) {
 }
 
 /* ===========================
+        EDIT PRODUCT
+=========================== */
+async function handleEditProduct(ctx) {
+  ctx.session ||= {};
+
+  try {
+    const txt = ctx.message?.text?.trim() || "";
+    if (!txt) {
+      return ctx.reply(
+        '❌ Tidak ada teks. Format:\n`id|nama|harga|stok|deskripsi|link1,link2`',
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    const parts = txt.split('|');
+
+    if (parts.length < 5) {
+      return ctx.reply(
+        '❌ Format salah!\nGunakan:\n`id|nama|harga|stok|deskripsi|link1,link2`',
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    const id         = parts[0].trim();
+    const name       = parts[1].trim();
+    const priceRaw   = parts[2].trim();
+    const stockRaw   = parts[3].trim();
+    const description = parts[4].trim();
+
+    // Bagian link — aman meski tidak ada
+    const linksRaw = parts[5] ? parts[5].trim() : "";
+
+    // Pastikan split link aman & tidak menyimpan string kosong
+    const links = linksRaw
+      ? linksRaw.split(',').map(l => l.trim()).filter(l => l.length > 0)
+      : [];
+
+    // Validasi angka
+    const price = Number(priceRaw);
+    const stock = Number(stockRaw);
+
+    if (!id) return ctx.reply('❌ ID produk tidak boleh kosong.');
+    if (!name) return ctx.reply('❌ Nama produk tidak boleh kosong.');
+    if (isNaN(price)) return ctx.reply('❌ Harga harus berupa angka.');
+    if (isNaN(stock)) return ctx.reply('❌ Stok harus berupa angka.');
+
+    console.log("UPDATE PRODUCT LINKS:", links); // debugging
+
+    // Kirim ke service
+    const updated = await productService.updateProduct(id, {
+      name,
+      price,
+      stock,
+      description,
+      links
+    });
+
+    if (!updated) {
+      return ctx.reply('❌ Produk tidak ditemukan atau gagal diperbarui.');
+    }
+
+    await ctx.reply('✅ Produk berhasil diperbarui!');
+  }
+
+  catch (err) {
+    console.error("handleEditProduct error:", err);
+    await ctx.reply(
+      '⚠️ Gagal update produk. Pastikan format:\n`id|nama|harga|stok|deskripsi|link1,link2`',
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  finally {
+    ctx.session.awaitingEditProduct = false;
+  }
+}
+
+/* ===========================
   ADD & DELETE PRODUCT
 =========================== */
 async function addProduct(ctx) {
   ctx.session ||= {};
   ctx.session.awaitingAddProduct = true;
-  await ctx.reply('🧾 Kirim data produk:\n`id|nama|harga|stok|deskripsi`', {
+  await ctx.reply('🧾 Kirim data produk:\n`id|nama|harga|stok|deskripsi|link`', {
     parse_mode: 'Markdown',
   });
 }
@@ -47,7 +127,7 @@ async function deleteProduct(ctx) {
 }
 
 /* ===========================
-        LIST ORDERS
+    LIST ORDERS
 =========================== */
 async function listOrders(ctx) {
   try {
@@ -213,19 +293,55 @@ async function handleSetHelpText(ctx) {
 }
 
 /* ===========================
+     UPLOAD HELP VIDEO
+=========================== */
+async function uploadHelpVideo(ctx) {
+  ctx.session ||= {};
+  ctx.session.awaitingHelpVideo = true;
+
+  await ctx.reply(
+    '🎥 Kirim *video bantuan* satu per satu.\n\nKirim /done jika selesai.',
+    { parse_mode: 'Markdown' }
+  );
+}
+
+async function handleUploadHelpVideo(ctx) {
+  if (ctx.message.text === '/done') {
+    ctx.session.awaitingHelpVideo = false;
+    return ctx.reply('✅ Semua video bantuan berhasil disimpan!');
+  }
+
+  if (!ctx.message.video) {
+    return ctx.reply('❌ Kirim *video*, bukan teks atau gambar.');
+  }
+
+  const fileId = ctx.message.video.file_id;
+
+  let videos = await settingsService.getSetting('help_videos');
+  videos = videos ? JSON.parse(videos) : [];
+
+  videos.push(fileId);
+
+  await settingsService.setSetting('help_videos', JSON.stringify(videos));
+
+  await ctx.reply('🎞 Video berhasil ditambahkan!');
+}
+
+/* ===========================
        EXPORT
 =========================== */
 module.exports = {
   showAdminMenu,
   addProduct,
   deleteProduct,
+  handleEditProduct,
   listOrders,
   confirmPayment,
   handleConfirmPayment,
   setResi,
   setStatus,
 
-  // greeting + handler FIXED
+  // greeting
   setGreeting,
   handleSetGreetingText,
 
@@ -233,7 +349,11 @@ module.exports = {
   setPaymentInfo,
   handleSetPaymentInfo,
 
-  // help
+  // help text
   setHelpText,
   handleSetHelpText,
+
+  // help video
+  uploadHelpVideo,
+  handleUploadHelpVideo,
 };

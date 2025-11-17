@@ -1,4 +1,5 @@
 // services/productService.js
+const { link } = require('telegraf/format');
 const { getClient } = require('../db/database');
 const PRODUCT_SET = 'products';
 
@@ -42,6 +43,7 @@ async function createProduct({ id, name, price, stock = 0, description = '', lin
     price: String(price),
     stock: String(stock),
     description: String(description),
+    links: String(links),
   });
 
   // Simpan link ke set terpisah
@@ -99,6 +101,7 @@ async function listProducts() {
       price: Number(data.price || 0),
       stock: Number(data.stock || 0),
       description: data.description || '',
+      links: data.links || '',
     });
   }
 
@@ -136,9 +139,37 @@ async function getProduct(id) {
   };
 }
 
+  /**
+ * Update product (mengganti data hash + set links)
+ * Mengembalikan true jika berhasil, false jika produk tidak ditemukan.
+ */
+async function updateProduct(id, data) {
+  const client = getClient();
+
+  // Pastikan set
+  await ensureValidSet(client);
+
+  const exists = await client.sIsMember(PRODUCT_SET, id.toString());
+  if (!exists) return false;
+
+  const key = `product:${id}`;
+
+  await client.hSet(key, {
+    name: data.name,
+    price: data.price,
+    stock: data.stock,
+    description: data.description,
+    links: JSON.stringify(data.links || [])
+  });
+
+  return true;
+}
+
+
 module.exports = {
   createProduct,
   deleteProduct,
   listProducts,
   getProduct,
+  updateProduct,
 };
