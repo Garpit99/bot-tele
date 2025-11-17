@@ -1,7 +1,7 @@
-// bot/handlers/fsmHandler.js
 const productService = require('../../services/productService');
 const orderService = require('../../services/orderService');
 const settingsService = require('../../services/settingsService');
+const buttonService = require('../../services/buttonService');
 const { link } = require('telegraf/format');
 
 // ------------------------------
@@ -49,12 +49,10 @@ async function handleState(ctx) {
 
     ctx.session.orderingProduct = null;
 
-    // --- AMBIL PAYMENT INFO DARI REDIS
     const paymentInfo =
       (await settingsService.getSetting('payment_info')) ||
       '🏦 *BANK BCA*\nNomor: `1234567890`\nA/N: PT Contoh Digital';
 
-    // --- KIRIM PESAN KE USER
     const userMsg =
       `✅ *Pesanan berhasil dibuat!*\n\n` +
       `🧾 *Order ID:* ${orderId}\n` +
@@ -67,7 +65,6 @@ async function handleState(ctx) {
 
     await ctx.replyWithMarkdown(userMsg);
 
-    // --- NOTIF ADMIN
     const adminIds = (process.env.ADMIN_IDS || '')
       .split(',')
       .map(a => a.trim())
@@ -90,37 +87,65 @@ async function handleState(ctx) {
   }
 
   /* ==========================
+        SET BUTTON LABEL (NEW)
+  ========================== */
+  if (ctx.session.awaitingSetButtonKey) {
+    try {
+      const key = ctx.session.awaitingSetButtonKey;
+      const value = text.trim();
+
+      if (!value) {
+        return ctx.reply("⚠️ Nama tombol tidak boleh kosong.");
+      }
+
+      // Simpan ke Redis melalui buttonService
+      await buttonService.setButtonLabel(key, value);
+
+      await ctx.reply(
+        `✅ Nama tombol *${key}* berhasil diperbarui!\n🆕 Nama baru: *${value}*`,
+        { parse_mode: "Markdown" }
+      );
+
+    } catch (e) {
+      console.error(e);
+      await ctx.reply("⚠️ Terjadi kesalahan saat update nama tombol.");
+    }
+
+    ctx.session.awaitingSetButtonKey = null;
+    return;
+  }
+
+  /* ==========================
        ADD PRODUCT
   ========================== */
   if (ctx.session.awaitingAddProduct) {
-  try {
-    const [id, name, price, stock, description, links] = text.split('|');
+    try {
+      const [id, name, price, stock, description, links] = text.split('|');
 
-    // Convert link menjadi array (support banyak link dipisah koma)
-    const linksArray = links
-      ? links.split(',').map(l => l.trim()).filter(l => l !== '')
-      : [];
+      const linksArray = links
+        ? links.split(',').map(l => l.trim()).filter(l => l !== '')
+        : [];
 
-    await productService.createProduct({
-      id: id.trim(),
-      name: name.trim(),
-      price: Number(price),
-      stock: Number(stock),
-      description: description.trim(),
-      links: linksArray,        // ← Wajib array!
-    });
+      await productService.createProduct({
+        id: id.trim(),
+        name: name.trim(),
+        price: Number(price),
+        stock: Number(stock),
+        description: description.trim(),
+        links: linksArray
+      });
 
-    await ctx.reply(
-      `✅ Produk *${name.trim()}* berhasil ditambahkan.`,
-      { parse_mode: 'Markdown' }
-    );
-  } catch (e) {
-    await ctx.reply('⚠️ Format salah! Gunakan: id|nama|harga|stok|deskripsi|link1,link2');
+      await ctx.reply(
+        `✅ Produk *${name.trim()}* berhasil ditambahkan.`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (e) {
+      await ctx.reply('⚠️ Format salah! Gunakan: id|nama|harga|stok|deskripsi|link1,link2');
+    }
+
+    ctx.session.awaitingAddProduct = false;
+    return;
   }
-
-  ctx.session.awaitingAddProduct = false;
-  return;
-}
 
   /* ==========================
        DELETE PRODUCT
@@ -229,12 +254,9 @@ async function handleState(ctx) {
   ========================== */
   if (ctx.session.awaitingSetPayment) {
     await settingsService.setSetting('payment_info', text);
-
-    await ctx.reply(
-      '💳 Info pembayaran berhasil diperbarui!',
-      { parse_mode: 'Markdown' }
-    );
-
+    await ctx.reply('💳 Info pembayaran berhasil diperbarui!', {
+      parse_mode: 'Markdown',
+    });
     ctx.session.awaitingSetPayment = false;
     return;
   }

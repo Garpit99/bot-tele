@@ -111,18 +111,19 @@ bot.command('admin', async (ctx) => {
   }
 });
 
-// Tombol admin
+// CRUD Produk
 bot.action('ADMIN_ADD_PRODUCT', (ctx) => adminHandler.addProduct(ctx));
 bot.action('ADMIN_DELETE_PRODUCT', (ctx) => adminHandler.deleteProduct(ctx));
+
 bot.action('ADMIN_EDIT_PRODUCT', async (ctx) => {
   ctx.session ||= {};
   ctx.session.awaitingEditProduct = true;
 
-  await ctx.reply('✏️ Kirim data produk yang ingin diedit:\n\n`id|nama|harga|stok|deskripsi|link1,link2`', {
-    parse_mode: 'Markdown'
-  });
+  await ctx.reply(
+    '✏️ Kirim data produk yang ingin diedit:\n\n`id|nama|harga|stok|deskripsi|link1,link2`',
+    { parse_mode: 'Markdown' }
+  );
 });
-
 
 bot.action('ADMIN_LIST_ORDERS', (ctx) => adminHandler.listOrders(ctx));
 bot.action('ADMIN_CONFIRM_PAYMENT', (ctx) => adminHandler.confirmPayment(ctx));
@@ -131,19 +132,31 @@ bot.action('ADMIN_SET_RESI', (ctx) => adminHandler.setResi(ctx));
 bot.action('ADMIN_SET_STATUS', (ctx) => adminHandler.setStatus(ctx));
 
 bot.action('ADMIN_SET_GREETING', (ctx) => adminHandler.setGreeting(ctx));
-bot.action('ADMIN_SET_PAYMENT', async (ctx) => {
-  await ctx.answerCbQuery();
-  return adminHandler.setPaymentInfo(ctx);
-});
+bot.action('ADMIN_SET_PAYMENT', (ctx) => adminHandler.setPaymentInfo(ctx));
 bot.action('ADMIN_SET_HELP', (ctx) => adminHandler.setHelpText(ctx));
 
-bot.action('ADMIN_UPLOAD_HELP_VIDEO', (ctx) => adminHandler.uploadHelpVideo(ctx)); // 🆕 BARU
+bot.action('ADMIN_UPLOAD_HELP_VIDEO', (ctx) => adminHandler.uploadHelpVideo(ctx));
+
+/* =====================================================
+   ✅ MENU LIST TOMBOL UTAMA
+===================================================== */
+bot.action('ADMIN_SET_BUTTONS', (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply("❌ Kamu bukan admin!");
+  return adminHandler.showSetButtonsMenu(ctx);
+});
+
+/* =====================================================
+   ✅ TOMBOL: Pilih Tombol Yang Mau Diedit
+===================================================== */
+bot.action(/^ADMIN_SET_BTN_/, (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply("❌ Kamu bukan admin!");
+  return adminHandler.handleSelectButtonToEdit(ctx);
+});
 
 /* ===================================
    🧾 UPLOAD & FSM INPUT HANDLER
 =================================== */
 
-// Upload foto — tetap
 bot.on('photo', (ctx) => {
   try {
     uploadHandler.handleUpload(ctx);
@@ -152,9 +165,6 @@ bot.on('photo', (ctx) => {
   }
 });
 
-/* ===================================
-   🎥 UPLOAD VIDEO BANTUAN (FITUR BARU)
-=================================== */
 bot.on('video', async (ctx) => {
   try {
     if (ctx.session?.awaitingHelpVideo) {
@@ -166,39 +176,49 @@ bot.on('video', async (ctx) => {
 });
 
 /* ===================================
-   ✏️ TEXT INPUT HANDLER (FSM + ADMIN)
+   ✏️ TEXT INPUT HANDLER
 =================================== */
 
 bot.on('text', async (ctx) => {
   try {
-    // ========== ADMIN UPDATE TEXT ==========
+    ctx.session ||= {};
 
-    if (ctx.session?.awaitingSetHelp) {
+    // SET HELP
+    if (ctx.session.awaitingSetHelp) {
       return adminHandler.handleSetHelpText(ctx);
     }
 
-    if (ctx.session?.awaitingSetGreeting) {
+    // SET GREETING
+    if (ctx.session.awaitingSetGreeting) {
       return adminHandler.handleSetGreetingText(ctx);
     }
 
-    if (ctx.session?.awaitingSetPayment) {
+    // SET PAYMENT INFO
+    if (ctx.session.awaitingSetPayment) {
       return adminHandler.handleSetPaymentInfo(ctx);
     }
 
-    if (ctx.session?.awaitingEditProduct) {
-      return adminHandler.handleEditProduct(ctx); // 🆕 BARU
+    // SET BUTTON LABEL (sudah benar → ke FSM)
+    if (ctx.session.awaitingSetButtonKey) {
+      return fsmHandler.handleState(ctx);
     }
 
-    if (ctx.session?.awaitingHelpVideo) {
-      return adminHandler.handleUploadHelpVideo(ctx); // jika teks "/done"
+    // EDIT PRODUCT
+    if (ctx.session.awaitingEditProduct) {
+      return adminHandler.handleEditProduct(ctx);
     }
 
-    // USER ORDER
-    if (ctx.session?.orderingProduct) {
+    // UPLOAD VIDEO BANTUAN
+    if (ctx.session.awaitingHelpVideo) {
+      return adminHandler.handleUploadHelpVideo(ctx);
+    }
+
+    // USER ORDER INPUT
+    if (ctx.session.orderingProduct) {
       return userHandler.handleOrderInput(ctx);
     }
 
-    // FSM
+    // fallback → FSM utama
     await fsmHandler.handleState(ctx);
 
   } catch (err) {
