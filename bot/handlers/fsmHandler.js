@@ -3,12 +3,24 @@ const productService = require('../../services/productService');
 const orderService = require('../../services/orderService');
 const settingsService = require('../../services/settingsService');
 
+// ------------------------------
+// Helper anti-spam untuk admin
+// ------------------------------
+const sentAdminMessages = new Set();
+function sendToAdminOnce(ctx, adminId, message) {
+  const hash = `${adminId}:${message}`;
+  if (sentAdminMessages.has(hash)) return;
+  sentAdminMessages.add(hash);
+  return ctx.telegram.sendMessage(adminId, message).catch(() => {});
+}
+
 async function handleState(ctx) {
-  ctx.session = ctx.session || {};
-  const text = ctx.message.text?.trim();
+  ctx.session ||= {};
+  const text = ctx.message?.text?.trim();
+  if (!text) return;
 
   /* ==========================
-     🛍️ USER ORDER INPUT
+       USER INPUT ORDER
   ========================== */
   if (ctx.session.orderingProduct) {
     const parts = text.split('|');
@@ -36,108 +48,112 @@ async function handleState(ctx) {
 
     ctx.session.orderingProduct = null;
 
-    // Kirim pesan konfirmasi order ke user
-    await ctx.reply(
-      `✅ Pesanan kamu berhasil dibuat!\n\n🧾 *Order ID:* ${orderId}\n🛍️ *${product.name}*\n💰 Rp${Number(
-        product.price
-      ).toLocaleString('id-ID')}\n📞 ${phone}\n📦 ${address}\n\nSilakan lakukan pembayaran ke:\n\n🏦 *BANK BCA*\n👤 a.n. PT Contoh Digital\n💳 *1234567890*\n\nSetelah transfer, kirim bukti pembayaran dengan caption berisi *Order ID* (contoh: ORD-123456).`,
-      { parse_mode: 'Markdown' }
-    );
+    // --- AMBIL PAYMENT INFO DARI REDIS
+    const paymentInfo =
+      (await settingsService.getSetting('payment_info')) ||
+      '🏦 *BANK BCA*\nNomor: `1234567890`\nA/N: PT Contoh Digital';
 
-    // 🔔 Kirim notifikasi ke admin
+    // --- KIRIM PESAN KE USER
+    const userMsg =
+      `✅ *Pesanan berhasil dibuat!*\n\n` +
+      `🧾 *Order ID:* ${orderId}\n` +
+      `📦 *Produk:* ${product.name}\n` +
+      `💰 Harga: Rp${Number(product.price).toLocaleString('id-ID')}\n` +
+      `📞 ${phone}\n` +
+      `📍 ${address}\n\n` +
+      `Silakan lakukan pembayaran ke rekening berikut:\n\n${paymentInfo}\n\n` +
+      `📤 Setelah transfer, kirim *foto bukti pembayaran* ke sini dengan caption Order ID.`;
+
+    await ctx.replyWithMarkdown(userMsg);
+
+    // --- NOTIF ADMIN
     const adminIds = (process.env.ADMIN_IDS || '')
       .split(',')
-      .map((x) => x.trim())
-      .filter(Boolean);
+      .map(a => a.trim())
+      .filter(a => a);
+
+    const adminMessage =
+      `📢 *Pesanan Baru Masuk!*\n\n` +
+      `🧾 Order ID: ${orderId}\n` +
+      `👤 Nama: ${name}\n` +
+      `📦 Produk: ${product.name}\n` +
+      `💰 Rp${Number(product.price).toLocaleString('id-ID')}\n` +
+      `📞 ${phone}\n` +
+      `📍 ${address}`;
+
     for (const adminId of adminIds) {
-      try {
-        await ctx.telegram.sendMessage(
-          adminId,
-          `📢 Pesanan Baru!\n\n🧾 Order ID: ${orderId}\n👤 Nama: ${name}\n📦 Produk: ${product.name}\n💰 Rp${Number(
-            product.price
-          ).toLocaleString('id-ID')}\n📞 ${phone}\n📍 ${address}`
-        );
-      } catch (err) {
-        console.error('❌ Gagal kirim notifikasi ke admin:', err);
-      }
+      sendToAdminOnce(ctx, adminId, adminMessage);
     }
 
     return;
   }
 
   /* ==========================
-     ⚙️ ADMIN FSM - TAMBAH PRODUK
+       ADD PRODUCT
   ========================== */
   if (ctx.session.awaitingAddProduct) {
     try {
-      const [id, name, price, stock, description, linksRaw] = text.split('|');
-      let links = [];
-      if (linksRaw && linksRaw.trim() !== '') {
-        links = linksRaw.split(',').map((l) => l.trim()).filter((l) => l.startsWith('http'));
-      }
-
+      const [id, name, price, stock, description] = text.split('|');
       await productService.createProduct({
         id: id.trim(),
         name: name.trim(),
         price: Number(price),
-        stock: Number(stock) || 0,
+        stock: Number(stock),
         description: description.trim(),
-        links,
       });
 
-      ctx.session.awaitingAddProduct = false;
-
       await ctx.reply(
-        `✅ Produk *${name.trim()}* berhasil disimpan!\n💰 Harga: Rp${price}\n📦 Stok: ${stock}\n📝 ${description}\n🔗 Link: ${links.length ? links.join(', ') : '(tidak ada)'}`,
+        `✅ Produk *${name.trim()}* berhasil ditambahkan.`,
         { parse_mode: 'Markdown' }
       );
-    } catch (err) {
-      console.error('❌ Error tambah produk:', err);
-      await ctx.reply('⚠️ Gagal menambah produk. Cek format dan coba lagi.');
+    } catch (e) {
+      await ctx.reply('⚠️ Format salah! Gunakan: id|nama|harga|stok|deskripsi');
     }
+
+    ctx.session.awaitingAddProduct = false;
     return;
   }
 
   /* ==========================
-     🗑️ HAPUS PRODUK
+       DELETE PRODUCT
   ========================== */
   if (ctx.session.awaitingDeleteProduct) {
     await productService.deleteProduct(text);
+    await ctx.reply(`🗑 Produk *${text}* berhasil dihapus.`, {
+      parse_mode: 'Markdown',
+    });
     ctx.session.awaitingDeleteProduct = false;
-    return ctx.reply(`🗑 Produk *${text}* berhasil dihapus.`, { parse_mode: 'Markdown' });
+    return;
   }
 
   /* ==========================
-     💳 KONFIRMASI PEMBAYARAN ADMIN
+      CONFIRM PAYMENT
   ========================== */
   if (ctx.session.awaitingConfirmOrder) {
-    const orderId = text.trim();
+    const orderId = text;
 
     try {
       const order = await orderService.getOrder(orderId);
       if (!order) return ctx.reply('❌ Order tidak ditemukan.');
 
-      // Update status jadi "paid"
       await orderService.updateOrder(orderId, { status: 'paid' });
 
-      // ✅ Konfirmasi ke admin
-      await ctx.reply(`✅ Order *${orderId}* dikonfirmasi lunas.`, { parse_mode: 'Markdown' });
+      await ctx.reply(
+        `✅ Pembayaran untuk *${orderId}* dikonfirmasi.`,
+        { parse_mode: 'Markdown' }
+      );
 
-      // 🔔 Kirim notifikasi ke user
-      if (order.userId) {
-        try {
-          await ctx.telegram.sendMessage(
-            order.userId,
-            `💰 *Pembayaran kamu sudah dikonfirmasi!*\n\n🧾 *Order ID:* ${orderId}\n📦 *Produk:* ${order.productName}\n💸 *Status:* Lunas / Sedang diproses.\n\nTerima kasih telah berbelanja 🙏`,
-            { parse_mode: 'Markdown' }
-          );
-        } catch (err) {
-          console.error('❌ Gagal kirim notifikasi ke user:', err);
-        }
-      }
-    } catch (err) {
-      console.error('❌ Error konfirmasi pembayaran:', err);
-      await ctx.reply('⚠️ Gagal konfirmasi pembayaran.');
+      const msg =
+        `💰 *Pembayaran kamu sudah dikonfirmasi!*\n\n` +
+        `🧾 Order ID: ${orderId}\n` +
+        `📦 Produk: ${order.productName}\n` +
+        `📌 Status: Lunas / Sedang diproses`;
+
+      await ctx.telegram.sendMessage(order.userId, msg, {
+        parse_mode: 'Markdown',
+      });
+    } catch (e) {
+      await ctx.reply('⚠️ Terjadi kesalahan.');
     }
 
     ctx.session.awaitingConfirmOrder = false;
@@ -145,50 +161,74 @@ async function handleState(ctx) {
   }
 
   /* ==========================
-     🚚 INPUT RESI
+          SET RESI
   ========================== */
   if (ctx.session.awaitingSetResi) {
-    const [orderId, resi] = text.split('|');
-    await orderService.updateOrder(orderId.trim(), {
-      trackingNumber: resi.trim(),
+    const [orderId, resi] = text.split('|').map(s => s.trim());
+
+    await orderService.updateOrder(orderId, {
+      trackingNumber: resi,
       status: 'shipped',
     });
-    ctx.session.awaitingSetResi = false;
 
-    // 🔔 Notifikasi ke user
-    const order = await orderService.getOrder(orderId.trim());
-    if (order && order.userId) {
-      try {
-        await ctx.telegram.sendMessage(
-          order.userId,
-          `🚚 Pesanan kamu telah dikirim!\n\n🧾 *Order ID:* ${orderId}\n📦 *Produk:* ${order.productName}\n🔢 *Nomor Resi:* ${resi}\n\nKamu bisa melacak pesananmu menggunakan nomor resi tersebut.`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (err) {
-        console.error('❌ Gagal kirim notifikasi resi ke user:', err);
-      }
+    await ctx.reply(
+      `🚚 Resi *${resi}* disimpan untuk order *${orderId}*.`,
+      { parse_mode: 'Markdown' }
+    );
+
+    const order = await orderService.getOrder(orderId);
+    if (order?.userId) {
+      await ctx.telegram.sendMessage(
+        order.userId,
+        `🚚 Pesanan kamu dikirim!\n\n🧾 *${orderId}*\n🔢 Resi: *${resi}*`,
+        { parse_mode: 'Markdown' }
+      );
     }
 
-    return ctx.reply(`🚚 Resi *${resi}* disimpan untuk *${orderId}*`, { parse_mode: 'Markdown' });
+    ctx.session.awaitingSetResi = false;
+    return;
   }
 
   /* ==========================
-     🔄 UBAH STATUS ORDER
+        SET STATUS
   ========================== */
   if (ctx.session.awaitingSetStatus) {
-    const [orderId, status] = text.split('|');
-    await orderService.updateOrder(orderId.trim(), { status: status.trim() });
+    const [orderId, status] = text.split('|').map(s => s.trim());
+
+    await orderService.updateOrder(orderId, { status });
+
+    await ctx.reply(
+      `🔄 Status order *${orderId}* diubah menjadi *${status}*`,
+      { parse_mode: 'Markdown' }
+    );
+
     ctx.session.awaitingSetStatus = false;
-    return ctx.reply(`🔄 Status *${orderId}* diubah menjadi *${status}*`, { parse_mode: 'Markdown' });
+    return;
   }
 
   /* ==========================
-     💬 UBAH GREETING
+        SET GREETING
   ========================== */
   if (ctx.session.awaitingSetGreeting) {
     await settingsService.setSetting('greeting', text);
+    await ctx.reply('💬 Greeting berhasil diperbarui.');
     ctx.session.awaitingSetGreeting = false;
-    return ctx.reply('💬 Greeting berhasil diperbarui.');
+    return;
+  }
+
+  /* ==========================
+       SET PAYMENT INFO
+  ========================== */
+  if (ctx.session.awaitingSetPayment) {
+    await settingsService.setSetting('payment_info', text);
+
+    await ctx.reply(
+      '💳 Info pembayaran berhasil diperbarui!',
+      { parse_mode: 'Markdown' }
+    );
+
+    ctx.session.awaitingSetPayment = false;
+    return;
   }
 }
 

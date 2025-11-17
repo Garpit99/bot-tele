@@ -25,7 +25,7 @@ function isAdmin(ctx) {
    👥 USER COMMANDS & MENU UTAMA
 =================================== */
 
-// /start command — tampilkan menu utama
+// /start → tampilkan menu utama
 bot.start(async (ctx) => {
   try {
     await userHandler.start(ctx, isAdmin(ctx));
@@ -34,7 +34,10 @@ bot.start(async (ctx) => {
   }
 });
 
-// tombol utama user
+// ===================================
+// USER BUTTONS
+// ===================================
+
 bot.action('VIEW_PRODUCTS', async (ctx) => {
   try {
     await userHandler.viewProducts(ctx);
@@ -59,7 +62,7 @@ bot.action(/^OPEN_LINK_/, async (ctx) => {
   }
 });
 
-/* ✅ tambahkan ini — agar tombol “Beli Produk” bisa bekerja */
+// tombol Beli Produk
 bot.action(/^BUY_PRODUCT_/, async (ctx) => {
   try {
     await userHandler.buyProduct(ctx);
@@ -68,7 +71,7 @@ bot.action(/^BUY_PRODUCT_/, async (ctx) => {
   }
 });
 
-/* ✅ tambahkan agar user bisa tracking order nanti */
+// Tracking
 bot.action('TRACK_ORDER', async (ctx) => {
   try {
     await userHandler.trackOrder(ctx);
@@ -77,7 +80,6 @@ bot.action('TRACK_ORDER', async (ctx) => {
   }
 });
 
-// command manual tracking
 bot.command('tracking', async (ctx) => {
   try {
     await userHandler.trackOrder(ctx);
@@ -86,11 +88,13 @@ bot.command('tracking', async (ctx) => {
   }
 });
 
+// Help button
+bot.action('HELP_MENU', (ctx) => userHandler.helpMenu(ctx));
+
 /* ===================================
-   🛠 ADMIN PANEL & ACTIONS
+   🛠 ADMIN PANEL
 =================================== */
 
-// Tombol "Admin Panel" dari menu utama
 bot.action('ADMIN_PANEL', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('❌ Kamu bukan admin!');
   try {
@@ -100,7 +104,6 @@ bot.action('ADMIN_PANEL', async (ctx) => {
   }
 });
 
-// Command manual: /admin
 bot.command('admin', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('❌ Kamu bukan admin!');
   try {
@@ -110,18 +113,25 @@ bot.command('admin', async (ctx) => {
   }
 });
 
-// Tombol-tombol di panel admin
+// Tombol admin
 bot.action('ADMIN_ADD_PRODUCT', (ctx) => adminHandler.addProduct(ctx));
 bot.action('ADMIN_DELETE_PRODUCT', (ctx) => adminHandler.deleteProduct(ctx));
 bot.action('ADMIN_LIST_ORDERS', (ctx) => adminHandler.listOrders(ctx));
 bot.action('ADMIN_CONFIRM_PAYMENT', (ctx) => adminHandler.confirmPayment(ctx));
 bot.action('ADMIN_SET_RESI', (ctx) => adminHandler.setResi(ctx));
 bot.action('ADMIN_SET_STATUS', (ctx) => adminHandler.setStatus(ctx));
+
 bot.action('ADMIN_SET_GREETING', (ctx) => adminHandler.setGreeting(ctx));
+bot.action('ADMIN_SET_PAYMENT', async (ctx) => {
+  await ctx.answerCbQuery();
+  return adminHandler.setPaymentInfo(ctx);
+});
+bot.action('ADMIN_SET_HELP', (ctx) => adminHandler.setHelpText(ctx));
 
 /* ===================================
    🧾 UPLOAD & FSM INPUT HANDLER
 =================================== */
+
 bot.on('photo', (ctx) => {
   try {
     uploadHandler.handleUpload(ctx);
@@ -130,16 +140,36 @@ bot.on('photo', (ctx) => {
   }
 });
 
-/* ✅ Update agar bisa tangkap input order user */
+// TEXT INPUT HANDLER (FSM)
 bot.on('text', async (ctx) => {
   try {
-    if (ctx.session?.orderingProduct) {
-      await userHandler.handleOrderInput(ctx); // <— kirim data order
-    } else {
-      await fsmHandler.handleState(ctx); // fallback FSM handler
+    // ===========================
+    // ADMIN TEXT UPDATE SECTION
+    // ===========================
+
+    if (ctx.session?.awaitingSetHelp) {
+      return adminHandler.handleSetHelpText(ctx);
     }
+
+    if (ctx.session?.awaitingSetGreeting) {
+      return adminHandler.handleSetGreetingText(ctx);
+    }
+
+    // FIXED: gunakan handler yang benar
+    if (ctx.session?.awaitingSetPayment) {
+      return adminHandler.handleSetPaymentInfo(ctx);
+    }
+
+    // USER ORDER INPUT
+    if (ctx.session?.orderingProduct) {
+      return userHandler.handleOrderInput(ctx);
+    }
+
+    // FSM SYSTEM
+    await fsmHandler.handleState(ctx);
+
   } catch (err) {
-    console.error('❌ FSM/text error:', err);
+    console.error("❌ FSM/text error:", err);
   }
 });
 

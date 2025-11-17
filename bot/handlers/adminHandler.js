@@ -1,11 +1,10 @@
-// bot/handlers/adminHandler.js
 const productService = require('../../services/productService');
 const orderService = require('../../services/orderService');
 const settingsService = require('../../services/settingsService');
 const { Markup } = require('telegraf');
 
 /* ===========================
-   🧭 Panel Admin Utama
+   SHOW ADMIN MENU
 =========================== */
 async function showAdminMenu(ctx) {
   try {
@@ -17,6 +16,8 @@ async function showAdminMenu(ctx) {
       [Markup.button.callback('🚚 Input Resi', 'ADMIN_SET_RESI')],
       [Markup.button.callback('🔄 Ubah Status Order', 'ADMIN_SET_STATUS')],
       [Markup.button.callback('💬 Ubah Greeting', 'ADMIN_SET_GREETING')],
+      [Markup.button.callback('💳 Ubah Rekening Pembayaran', 'ADMIN_SET_PAYMENT')],
+      [Markup.button.callback('❓ Ubah Text Bantuan', 'ADMIN_SET_HELP')],
     ]);
 
     await ctx.reply('📋 *Panel Admin* — pilih aksi:', {
@@ -24,35 +25,36 @@ async function showAdminMenu(ctx) {
       ...keyboard,
     });
   } catch (err) {
-    console.error('❌ showAdminMenu error:', err);
     await ctx.reply('Terjadi kesalahan membuka panel admin.');
   }
 }
 
 /* ===========================
-   ➕ Tambah & Hapus Produk
+  ADD & DELETE PRODUCT
 =========================== */
 async function addProduct(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingAddProduct = true;
-  await ctx.reply('🧾 Kirim data produk dalam format:\n\n`id|nama|harga|stok|deskripsi`', {
+  await ctx.reply('🧾 Kirim data produk:\n`id|nama|harga|stok|deskripsi`', {
     parse_mode: 'Markdown',
   });
 }
 
 async function deleteProduct(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingDeleteProduct = true;
   await ctx.reply('🗑 Kirim *ID produk* yang ingin dihapus:', { parse_mode: 'Markdown' });
 }
 
 /* ===========================
-   📦 Daftar & Kelola Order
+        LIST ORDERS
 =========================== */
 async function listOrders(ctx) {
   try {
     const orders = await orderService.listOrders();
     if (!orders.length) return ctx.reply('📭 Belum ada order.');
+
+    let msg = '📦 *Daftar Order*\n\n';
 
     for (const o of orders) {
       const total =
@@ -62,31 +64,28 @@ async function listOrders(ctx) {
           ? Number(o.price)
           : 0;
 
-      await ctx.replyWithMarkdown(
-        `📦 *${o.id}*\n👤 User: ${o.userId}\n💰 Total: Rp${total.toLocaleString(
-          'id-ID'
-        )}\n📍 Status: *${o.status || '-'}*`
-      );
+      msg +=
+        `📦 *${o.id}*\n` +
+        `👤 User: ${o.userId}\n` +
+        `💰 Total: Rp${total.toLocaleString('id-ID')}\n` +
+        `📍 Status: *${o.status || '-'}*\n\n`;
     }
+
+    await ctx.replyWithMarkdown(msg);
   } catch (err) {
-    console.error('❌ listOrders error:', err);
     await ctx.reply('Gagal memuat daftar order.');
   }
 }
 
 /* ===========================
-   💳 Konfirmasi Pembayaran
+    CONFIRM PAYMENT
 =========================== */
 async function confirmPayment(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingConfirmOrder = true;
-  await ctx.reply('💳 Kirim ID order untuk dikonfirmasi pembayarannya (contoh: ORD-1234)');
+  await ctx.reply('💳 Kirim ID order (contoh: ORD-1234)');
 }
 
-/**
- * ✅ Dipanggil oleh FSM ketika admin kirim ID order
- * contoh input: ORD-1762963746149
- */
 async function handleConfirmPayment(ctx) {
   const orderId = ctx.message.text.trim();
 
@@ -96,23 +95,20 @@ async function handleConfirmPayment(ctx) {
 
     await orderService.updateOrder(orderId, { status: 'paid' });
 
-    // ✅ Kirim pesan konfirmasi ke admin
-    await ctx.reply(`✅ Order *${orderId}* dikonfirmasi lunas.`, { parse_mode: 'Markdown' });
+    await ctx.reply(`✅ Order *${orderId}* dikonfirmasi lunas.`, {
+      parse_mode: 'Markdown',
+    });
 
-    // 🔔 Kirim notifikasi ke user
-    if (order.userId) {
-      try {
-        await ctx.telegram.sendMessage(
-          order.userId,
-          `💰 *Pembayaran kamu sudah dikonfirmasi!*\n\n🧾 *Order ID:* ${orderId}\n📦 *Produk:* ${order.productName}\n💸 *Status:* Lunas / Sedang diproses.\n\nTerima kasih telah berbelanja 🙏`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (err) {
-        console.error('❌ Gagal kirim notifikasi ke user:', err);
-      }
-    }
+    const msg =
+      `💰 *Pembayaran kamu sudah dikonfirmasi!*\n\n` +
+      `🧾 *Order ID:* ${orderId}\n` +
+      `📦 *Produk:* ${order.productName}\n` +
+      `💸 *Status:* Lunas / Sedang diproses.`;
+
+    await ctx.telegram.sendMessage(order.userId, msg, {
+      parse_mode: 'Markdown',
+    });
   } catch (err) {
-    console.error('❌ Error konfirmasi pembayaran:', err);
     await ctx.reply('⚠️ Gagal konfirmasi pembayaran.');
   }
 
@@ -120,35 +116,104 @@ async function handleConfirmPayment(ctx) {
 }
 
 /* ===========================
-   🚚 Input Resi & Status Order
+     RESI & STATUS
 =========================== */
 async function setResi(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingSetResi = true;
-  await ctx.reply('🚚 Kirim data dalam format:\n\n`ORD-...|nomor_resi`', {
-    parse_mode: 'Markdown',
-  });
+
+  await ctx.reply('🚚 Kirim:\n`ORD-xxx|resi`', { parse_mode: 'Markdown' });
 }
 
 async function setStatus(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingSetStatus = true;
-  await ctx.reply('🔄 Kirim data dalam format:\n\n`ORD-...|status`', {
-    parse_mode: 'Markdown',
-  });
+
+  await ctx.reply('🔄 Kirim:\n`ORD-xxx|status`', { parse_mode: 'Markdown' });
 }
 
 /* ===========================
-   💬 Greeting
+       GREETING
 =========================== */
 async function setGreeting(ctx) {
-  ctx.session = ctx.session || {};
+  ctx.session ||= {};
   ctx.session.awaitingSetGreeting = true;
-  await ctx.reply('💬 Kirim teks greeting baru:');
+
+  const current = await settingsService.getSetting('greeting');
+
+  await ctx.reply(
+    `💬 Kirim greeting baru.\n\n📄 *Saat ini:*\n${current || '_Belum diatur_'}`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
+async function handleSetGreetingText(ctx) {
+  const text = ctx.message.text.trim();
+
+  await settingsService.setSetting('greeting', text);
+
+  await ctx.reply('✅ Greeting berhasil diperbarui!', {
+    parse_mode: 'Markdown',
+  });
+
+  ctx.session.awaitingSetGreeting = false;
 }
 
 /* ===========================
-   🧩 Ekspor Semua Fungsi
+       PAYMENT INFO
+=========================== */
+async function setPaymentInfo(ctx) {
+  ctx.session ||= {};
+  ctx.session.awaitingSetPayment = true;
+
+  await ctx.reply(
+    '💳 Kirim info pembayaran baru (contoh format):\n\n' +
+      '🏦 *BANK BCA*\nNomor: `1234567890`\nA/N: PT Contoh Toko Makmur',
+    { parse_mode: 'Markdown' }
+  );
+}
+
+async function handleSetPaymentInfo(ctx) {
+  const text = ctx.message.text.trim();
+
+  await settingsService.setSetting('payment_info', text);
+
+  await ctx.reply('✅ Info pembayaran berhasil diperbarui.', {
+    parse_mode: 'Markdown',
+  });
+
+  ctx.session.awaitingSetPayment = false;
+}
+
+/* ===========================
+       HELP TEXT
+=========================== */
+async function setHelpText(ctx) {
+  ctx.session ||= {};
+  ctx.session.awaitingSetHelp = true;
+
+  const current = await settingsService.getSetting('help');
+
+  await ctx.reply(
+    `❓ Kirim teks bantuan baru.\n\n📄 *Saat ini:*\n${current || '_Belum diatur_'}`,
+    { parse_mode: 'Markdown' }
+  );
+}
+
+async function handleSetHelpText(ctx) {
+  const text = ctx.message.text.trim();
+
+  await settingsService.setSetting('help', text);
+
+  await ctx.reply('✅ Teks bantuan berhasil diperbarui!', {
+    parse_mode: 'Markdown',
+  });
+
+  ctx.session.awaitingSetHelp = false;
+}
+
+/* ===========================
+       EXPORT
 =========================== */
 module.exports = {
   showAdminMenu,
@@ -156,8 +221,19 @@ module.exports = {
   deleteProduct,
   listOrders,
   confirmPayment,
-  handleConfirmPayment, // <— fungsi baru untuk kirim notif ke user
+  handleConfirmPayment,
   setResi,
   setStatus,
+
+  // greeting + handler FIXED
   setGreeting,
+  handleSetGreetingText,
+
+  // payment
+  setPaymentInfo,
+  handleSetPaymentInfo,
+
+  // help
+  setHelpText,
+  handleSetHelpText,
 };
