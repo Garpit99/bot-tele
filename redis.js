@@ -3,7 +3,7 @@ const { createClient } = require('redis');
 async function main() {
   const redisUrl =
     process.env.REDIS_URL ||
-    'rediss://default:Ae00000K+YGVhpO84qQ2z7xVxybbDgUnPCEM/frnvMY/hQf8dXKIQGMvYPupOBR0Z15ieur@db-pevk-gffc-178851.leapcell.cloud:6379';
+    
 
   // Encode password jika perlu
   let safeUrl = redisUrl;
