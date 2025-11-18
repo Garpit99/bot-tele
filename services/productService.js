@@ -1,133 +1,37 @@
-// services/productService.js
-const { link } = require('telegraf/format');
 const { getClient } = require('../db/database');
 const PRODUCT_SET = 'products';
 
-/**
- * 🧩 Pastikan key 'products' adalah set
- */
+/* ============================================================
+   🧩 Pastikan SET valid
+============================================================ */
 async function ensureValidSet(client) {
   const type = await client.type(PRODUCT_SET);
   if (type !== 'set' && type !== 'none') {
-    console.warn(`⚠️ Key '${PRODUCT_SET}' invalid type: ${type}. Direset...`);
     await client.del(PRODUCT_SET);
-    await client.sAdd(PRODUCT_SET, 'TEMP_FIX');
-    await client.sRem(PRODUCT_SET, 'TEMP_FIX');
-    console.log(`✅ '${PRODUCT_SET}' diinisialisasi ulang sebagai SET`);
+    await client.sAdd(PRODUCT_SET, 'TMP');
+    await client.sRem(PRODUCT_SET, 'TMP');
   }
 }
 
-/**
- * 🧱 Tambah produk baru (dengan multi-link)
- */
-async function createProduct({ id, name, price, stock = 0, description = '', links = [] }) {
-  const client = getClient();
-  if (!client) throw new Error('❌ Redis client belum terhubung');
+/* ============================================================
+   🔧 Normalisasi produk agar aman dipakai bot
+============================================================ */
+function normalizeProduct(data) {
+  if (!data) return null;
 
-  await ensureValidSet(client);
+  let links = [];
 
-  const key = `product:${id}`;
-  const linksKey = `product_links:${id}`;
-  const type = await client.type(key);
-
-  // Hapus kalau bukan hash
-  if (type && type !== 'none' && type !== 'hash') {
-    console.warn(`⚠️ ${key} tipe ${type} bukan hash — dihapus otomatis`);
-    await client.del(key);
-  }
-
-  // Simpan data produk utama
-  await client.hSet(key, {
-    id: String(id),
-    name: String(name),
-    price: String(price),
-    stock: String(stock),
-    description: String(description),
-    links: String(links),
-  });
-
-  // Simpan link ke set terpisah
-  if (Array.isArray(links) && links.length > 0) {
-    await client.del(linksKey); // reset dulu
-    await client.sAdd(linksKey, links);
-    console.log(`🔗 ${links.length} link disimpan untuk ${id}`);
-  }
-
-  await client.sAdd(PRODUCT_SET, id);
-  console.log(`✅ Produk ${id} disimpan`);
-}
-
-/**
- * ❌ Hapus produk
- */
-async function deleteProduct(id) {
-  const client = getClient();
-  if (!client) throw new Error('❌ Redis client belum terhubung');
-
-  await client.del(`product:${id}`);
-  await client.del(`product_links:${id}`);
-  await client.sRem(PRODUCT_SET, id);
-  console.log(`🗑 Produk ${id} dihapus`);
-}
-
-/**
- * 📦 Ambil semua produk (tanpa link)
- */
-async function listProducts() {
-  const client = getClient();
-  if (!client) throw new Error('❌ Redis client belum terhubung');
-
-  await ensureValidSet(client);
-  const ids = await client.sMembers(PRODUCT_SET);
-  if (!ids || ids.length === 0) return [];
-
-  const result = [];
-  for (const id of ids) {
-    const key = `product:${id}`;
-    const type = await client.type(key);
-
-    if (type !== 'hash') {
-      await client.del(key);
-      await client.sRem(PRODUCT_SET, id);
-      continue;
+  // links bisa berupa string, array, JSON, atau null
+  if (Array.isArray(data.links)) {
+    links = data.links;
+  } else if (typeof data.links === 'string') {
+    try {
+      links = JSON.parse(data.links);
+      if (!Array.isArray(links)) links = [data.links];
+    } catch {
+      links = data.links ? [data.links] : [];
     }
-
-    const data = await client.hGetAll(key);
-    if (!data || !data.id) continue;
-
-    result.push({
-      id: data.id,
-      name: data.name,
-      price: Number(data.price || 0),
-      stock: Number(data.stock || 0),
-      description: data.description || '',
-      links: data.links || '',
-    });
   }
-
-  return result;
-}
-
-/**
- * 🔍 Ambil produk by ID + satu link acak
- */
-async function getProduct(id) {
-  const client = getClient();
-  if (!client) throw new Error('❌ Redis client belum terhubung');
-
-  const key = `product:${id}`;
-  const type = await client.type(key);
-
-  if (type !== 'hash') {
-    await client.del(key);
-    return null;
-  }
-
-  const data = await client.hGetAll(key);
-  if (!data || !data.id) return null;
-
-  // Ambil satu link acak
-  const randomLink = await client.sRandMember(`product_links:${id}`);
 
   return {
     id: data.id,
@@ -135,41 +39,174 @@ async function getProduct(id) {
     price: Number(data.price || 0),
     stock: Number(data.stock || 0),
     description: data.description || '',
+    links,
+  };
+}
+
+/* ============================================================
+   ➕ Tambah Produk
+============================================================ */
+async function createProduct({ id, name, price, stock = 0, description = '', links = [] }) {
+  const client = getClient();
+  await ensureValidSet(client);
+
+  const key = `product:${id}`;
+  const linksKey = `product_links:${id}`;
+
+  // Cek dulu apakah ID sudah dipakai
+  const exists = await client.sIsMember(PRODUCT_SET, id.toString());
+  if (exists) return false;
+
+  await client.hSet(key, {
+    id: id.toString(),
+    name,
+    price,
+    stock,
+    description,
+    links: JSON.stringify(links),
+  });
+
+  await client.del(linksKey);
+  if (links.length > 0) await client.sAdd(linksKey, links);
+
+  await client.sAdd(PRODUCT_SET, id.toString());
+
+  return true;   // ← FIX UTAMA
+}
+
+/* ============================================================
+   🗑 Hapus Produk
+============================================================ */
+async function deleteProduct(id) {
+  const client = getClient();
+  await client.del(`product:${id}`);
+  await client.del(`product_links:${id}`);
+  await client.sRem(PRODUCT_SET, id.toString());
+}
+
+/* ============================================================
+   📦 Ambil Semua Produk
+============================================================ */
+async function listProducts() {
+  const client = getClient();
+  await ensureValidSet(client);
+
+  const ids = await client.sMembers(PRODUCT_SET);
+  if (!ids.length) return [];
+
+  const result = [];
+
+  for (const id of ids) {
+    const data = await client.hGetAll(`product:${id}`);
+    if (!data.id) continue;
+
+    result.push(normalizeProduct(data));
+  }
+
+  return result;
+}
+
+/* ============================================================
+   🔍 Ambil Produk (untuk User)
+============================================================ */
+async function getProduct(id) {
+  const client = getClient();
+  const data = await client.hGetAll(`product:${id}`);
+  if (!data.id) return null;
+
+  const product = normalizeProduct(data);
+
+  const randomLink = await client.sRandMember(`product_links:${id}`);
+  return {
+    ...product,
     link: randomLink || null,
   };
 }
 
-  /**
- * Update product (mengganti data hash + set links)
- * Mengembalikan true jika berhasil, false jika produk tidak ditemukan.
- */
+/* ============================================================
+   🔍 Ambil Produk Lengkap (untuk Edit)
+============================================================ */
+async function getProductById(id) {
+  const client = getClient();
+  const data = await client.hGetAll(`product:${id}`);
+  if (!data.id) return null;
+
+  const product = normalizeProduct(data);
+  const links = await client.sMembers(`product_links:${id}`);
+
+  product.links = links;
+
+  return product;
+}
+
+/* ============================================================
+   ✏️ Update Produk
+============================================================ */
 async function updateProduct(id, data) {
   const client = getClient();
-
-  // Pastikan set
   await ensureValidSet(client);
 
-  const exists = await client.sIsMember(PRODUCT_SET, id.toString());
-  if (!exists) return false;
-
+  id = id.toString();
   const key = `product:${id}`;
+  const linksKey = `product_links:${id}`;
 
+  // Cek keberadaan produk lewat hash dan SET
+  const hashExists = await client.exists(key);
+  const setExists = await client.sIsMember(PRODUCT_SET, id);
+
+  if (!hashExists && !setExists) {
+    console.log("❌ PRODUK TIDAK DITEMUKAN:", id);
+    return false;
+  }
+
+  // Normalisasi links
+  let newLinks = [];
+  if (Array.isArray(data.links)) {
+    newLinks = data.links;
+  } else if (typeof data.links === "string") {
+    newLinks = data.links.split(",").map(v => v.trim()).filter(v => v.length);
+  }
+
+  // Update HASH
   await client.hSet(key, {
-    name: data.name,
-    price: data.price,
-    stock: data.stock,
-    description: data.description,
-    links: JSON.stringify(data.links || [])
+    id,
+    name: data.name || "",
+    price: Number(data.price || 0),
+    stock: Number(data.stock || 0),
+    description: data.description || "",
+    links: JSON.stringify(newLinks),
   });
+
+  // Update SET links
+  await client.del(linksKey);
+  if (newLinks.length > 0) await client.sAdd(linksKey, newLinks);
+
+  // Pastikan ID ada di SET products
+  await client.sAdd(PRODUCT_SET, id);
 
   return true;
 }
 
+/* ============================================================
+   🔗 Update link saja
+============================================================ */
+async function setProductLinks(id, links) {
+  const client = getClient();
+
+  await client.del(`product_links:${id}`);
+  if (links.length > 0) await client.sAdd(`product_links:${id}`, links);
+
+  await client.hSet(`product:${id}`, {
+    links: JSON.stringify(links),
+  });
+}
 
 module.exports = {
   createProduct,
   deleteProduct,
   listProducts,
   getProduct,
+  getProductById,
   updateProduct,
+  setProductLinks,
 };

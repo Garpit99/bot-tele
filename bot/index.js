@@ -4,9 +4,23 @@ const userHandler = require('./handlers/userHandler');
 const adminHandler = require('./handlers/adminHandler');
 const uploadHandler = require('./handlers/uploadHandler');
 const fsmHandler = require('./handlers/fsmHandler');
+const { connect } = require('../db/database'); // ⬅ PENTING: panggil connect()
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error('BOT_TOKEN required');
+
+// ==============================
+// 🔌 CONNECT REDIS SEBELUM BOT JALAN
+// ==============================
+(async () => {
+  try {
+    await connect(); // ⬅ WAJIB, agar getClient() tidak error
+    console.log('🔗 Redis connected — starting bot...');
+  } catch (err) {
+    console.error("❌ Redis failed to connect:", err);
+    process.exit(1);
+  }
+})();
 
 const bot = new Telegraf(BOT_TOKEN);
 bot.use(session());
@@ -32,10 +46,6 @@ bot.start(async (ctx) => {
     console.error('❌ Error in /start:', err);
   }
 });
-
-// ===================================
-// USER BUTTONS
-// ===================================
 
 bot.action('VIEW_PRODUCTS', async (ctx) => {
   try {
@@ -69,7 +79,6 @@ bot.action(/^BUY_PRODUCT_/, async (ctx) => {
   }
 });
 
-// Tracking
 bot.action('TRACK_ORDER', async (ctx) => {
   try {
     await userHandler.trackOrder(ctx);
@@ -86,11 +95,16 @@ bot.command('tracking', async (ctx) => {
   }
 });
 
-// Help
-bot.action('HELP_MENU', (ctx) => userHandler.helpMenu(ctx));
+bot.action('HELP_MENU', async (ctx) => {
+  try {
+    await userHandler.helpMenu(ctx);
+  } catch (err) {
+    console.error('❌ HELP_MENU error:', err);
+  }
+});
 
 /* ===================================
-   🛠 ADMIN PANEL
+   🛠 ADMIN PANEL & ACTIONS
 =================================== */
 
 bot.action('ADMIN_PANEL', async (ctx) => {
@@ -111,52 +125,47 @@ bot.command('admin', async (ctx) => {
   }
 });
 
-// CRUD Produk
+/* ============ ADMIN PRODUCT MENU ============ */
+
 bot.action('ADMIN_ADD_PRODUCT', (ctx) => adminHandler.addProduct(ctx));
-bot.action('ADMIN_DELETE_PRODUCT', (ctx) => adminHandler.deleteProduct(ctx));
+bot.action('ADMIN_EDIT_PRODUCT', (ctx) => adminHandler.showEditProductMenu(ctx));
+bot.action('ADMIN_DELETE_PRODUCT', (ctx) => adminHandler.showDeleteProductMenu(ctx));
 
-bot.action('ADMIN_EDIT_PRODUCT', async (ctx) => {
-  ctx.session ||= {};
-  ctx.session.awaitingEditProduct = true;
+bot.action(/^EDIT_PROD_/, (ctx) => adminHandler.handleSelectProductToEdit(ctx));
+bot.action(/^DEL_PROD_/, (ctx) => adminHandler.handleSelectDeleteProduct(ctx));
+bot.action(/^CONFIRM_DEL_/, (ctx) => adminHandler.handleConfirmDeleteProduct(ctx));
+bot.action(/^CANCEL_DEL_/, (ctx) => adminHandler.handleCancelDeleteProduct(ctx));
 
-  await ctx.reply(
-    '✏️ Kirim data produk yang ingin diedit:\n\n`id|nama|harga|stok|deskripsi|link1,link2`',
-    { parse_mode: 'Markdown' }
-  );
-});
+/* ============ ORDERS ============ */
 
 bot.action('ADMIN_LIST_ORDERS', (ctx) => adminHandler.listOrders(ctx));
 bot.action('ADMIN_CONFIRM_PAYMENT', (ctx) => adminHandler.confirmPayment(ctx));
 
+/* ============ RESI & STATUS ============ */
+
 bot.action('ADMIN_SET_RESI', (ctx) => adminHandler.setResi(ctx));
 bot.action('ADMIN_SET_STATUS', (ctx) => adminHandler.setStatus(ctx));
+
+/* ============ GREETING / PAYMENT / HELP ============ */
 
 bot.action('ADMIN_SET_GREETING', (ctx) => adminHandler.setGreeting(ctx));
 bot.action('ADMIN_SET_PAYMENT', (ctx) => adminHandler.setPaymentInfo(ctx));
 bot.action('ADMIN_SET_HELP', (ctx) => adminHandler.setHelpText(ctx));
 
-bot.action('ADMIN_UPLOAD_HELP_VIDEO', (ctx) => adminHandler.uploadHelpVideo(ctx));
+/* ============ BUTTON CUSTOMIZATION ============ */
 
-/* =====================================================
-   ✅ MENU LIST TOMBOL UTAMA
-===================================================== */
-bot.action('ADMIN_SET_BUTTONS', (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Kamu bukan admin!");
-  return adminHandler.showSetButtonsMenu(ctx);
-});
+bot.action('ADMIN_SET_BUTTONS', (ctx) => adminHandler.showSetButtonsMenu(ctx));
+bot.action(/^ADMIN_SET_BTN_/, (ctx) => adminHandler.handleSelectButtonToEdit(ctx));
 
-/* =====================================================
-   ✅ TOMBOL: Pilih Tombol Yang Mau Diedit
-===================================================== */
-bot.action(/^ADMIN_SET_BTN_/, (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Kamu bukan admin!");
-  return adminHandler.handleSelectButtonToEdit(ctx);
-});
+/* ============ VIDEO UPLOAD ============ */
+
+bot.action('ADMIN_UPLOAD_VIDEO', (ctx) => adminHandler.uploadHelpVideo(ctx));
+bot.on('video', (ctx) => adminHandler.handleUploadHelpVideo(ctx));
+bot.command('done', (ctx) => adminHandler.handleUploadHelpVideo(ctx));
 
 /* ===================================
-   🧾 UPLOAD & FSM INPUT HANDLER
+   🧾 UPLOAD BUKTI BAYAR
 =================================== */
-
 bot.on('photo', (ctx) => {
   try {
     uploadHandler.handleUpload(ctx);
@@ -165,71 +174,32 @@ bot.on('photo', (ctx) => {
   }
 });
 
-bot.on('video', async (ctx) => {
-  try {
-    if (ctx.session?.awaitingHelpVideo) {
-      return adminHandler.handleUploadHelpVideo(ctx);
-    }
-  } catch (err) {
-    console.error('❌ Video upload error:', err);
-  }
-});
-
 /* ===================================
-   ✏️ TEXT INPUT HANDLER
+   📝 GLOBAL TEXT HANDLER
 =================================== */
 
 bot.on('text', async (ctx) => {
   try {
-    ctx.session ||= {};
+    if (ctx.session?.orderingProduct) return userHandler.handleOrderInput(ctx);
+    if (ctx.session?.awaitingAddProduct) return adminHandler.handleAddProduct(ctx);
+    if (ctx.session?.awaitingEditProduct) return adminHandler.handleEditProduct(ctx);
+    if (ctx.session?.awaitingSetGreeting) return adminHandler.handleSetGreetingText(ctx);
+    if (ctx.session?.awaitingSetPayment) return adminHandler.handleSetPaymentInfo(ctx);
+    if (ctx.session?.awaitingSetHelp) return adminHandler.handleSetHelpText(ctx);
+    if (ctx.session?.awaitingConfirmOrder) return adminHandler.handleConfirmPayment(ctx);
+    if (ctx.session?.awaitingSetButtonKey) return adminHandler.handleSetButtonLabel(ctx);
 
-    // SET HELP
-    if (ctx.session.awaitingSetHelp) {
-      return adminHandler.handleSetHelpText(ctx);
-    }
-
-    // SET GREETING
-    if (ctx.session.awaitingSetGreeting) {
-      return adminHandler.handleSetGreetingText(ctx);
-    }
-
-    // SET PAYMENT INFO
-    if (ctx.session.awaitingSetPayment) {
-      return adminHandler.handleSetPaymentInfo(ctx);
-    }
-
-    // SET BUTTON LABEL (sudah benar → ke FSM)
-    if (ctx.session.awaitingSetButtonKey) {
-      return fsmHandler.handleState(ctx);
-    }
-
-    // EDIT PRODUCT
-    if (ctx.session.awaitingEditProduct) {
-      return adminHandler.handleEditProduct(ctx);
-    }
-
-    // UPLOAD VIDEO BANTUAN
-    if (ctx.session.awaitingHelpVideo) {
-      return adminHandler.handleUploadHelpVideo(ctx);
-    }
-
-    // USER ORDER INPUT
-    if (ctx.session.orderingProduct) {
-      return userHandler.handleOrderInput(ctx);
-    }
-
-    // fallback → FSM utama
-    await fsmHandler.handleState(ctx);
-
+    return fsmHandler.handleState(ctx);
   } catch (err) {
-    console.error("❌ FSM/text error:", err);
+    console.error('❌ GLOBAL TEXT ERROR:', err);
   }
 });
 
 /* ===================================
    ⚠️ GLOBAL ERROR HANDLER
 =================================== */
-bot.catch((err, ctx) => {
+
+bot.catch((err) => {
   console.error('❌ Unhandled bot error:', err);
 });
 
