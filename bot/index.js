@@ -1,206 +1,165 @@
-// bot/index.js
-const { Telegraf, session } = require('telegraf');
-const userHandler = require('./handlers/userHandler');
-const adminHandler = require('./handlers/adminHandler');
-const uploadHandler = require('./handlers/uploadHandler');
-const fsmHandler = require('./handlers/fsmHandler');
-const { connect } = require('../db/database'); // ⬅ PENTING: panggil connect()
+require("dotenv").config();
+const { Telegraf } = require("telegraf");
+const admin = require("./handlers/adminHandler");
+const user = require("./handlers/userHandler");
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error('BOT_TOKEN required');
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// ==============================
-// 🔌 CONNECT REDIS SEBELUM BOT JALAN
-// ==============================
-(async () => {
-  try {
-    await connect(); // ⬅ WAJIB, agar getClient() tidak error
-    console.log('🔗 Redis connected — starting bot...');
-  } catch (err) {
-    console.error("❌ Redis failed to connect:", err);
-    process.exit(1);
-  }
-})();
+// ========================================
+// ADMIN LIST
+// ========================================
+const ADMIN_IDS = (process.env.ADMIN_IDS || "")
+  .split(",")
+  .map((x) => x.trim());
 
-const bot = new Telegraf(BOT_TOKEN);
-bot.use(session());
+// ========================================
+// SESSION MIDDLEWARE
+// ========================================
+const session = {};
+bot.use((ctx, next) => {
+  const chatId = ctx.chat?.id;
+  if (!session[chatId]) session[chatId] = {};
+  ctx.session = session[chatId];
+  return next();
+});
 
-// 🧑‍💼 List admin dari .env
-const ADMIN_IDS = (process.env.ADMIN_IDS || '')
-  .split(',')
-  .map((x) => x.trim())
-  .filter(Boolean);
-
-function isAdmin(ctx) {
-  return ADMIN_IDS.includes(String(ctx.from?.id));
-}
-
-/* ===================================
-   👥 USER COMMANDS & MENU UTAMA
-=================================== */
-
+// ========================================
+// /START
+// ========================================
 bot.start(async (ctx) => {
-  try {
-    await userHandler.start(ctx, isAdmin(ctx));
-  } catch (err) {
-    console.error('❌ Error in /start:', err);
-  }
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+  await user.start(ctx, isAdmin);
 });
 
-bot.action('VIEW_PRODUCTS', async (ctx) => {
-  try {
-    await userHandler.viewProducts(ctx);
-  } catch (err) {
-    console.error('❌ VIEW_PRODUCTS error:', err);
+// ========================================
+// /admin
+// ========================================
+bot.command("admin", (ctx) => {
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+
+  if (!isAdmin) {
+    return ctx.reply("❌ Anda bukan admin. Akses ditolak.");
   }
+
+  return admin.showAdminMenu(ctx);
 });
 
-bot.action(/^VIEW_DETAIL_/, async (ctx) => {
-  try {
-    await userHandler.viewProductDetail(ctx);
-  } catch (err) {
-    console.error('❌ VIEW_DETAIL error:', err);
+// ========================================
+// CALLBACK QUERY ROUTER
+// ========================================
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+
+  // 👉 ROUTER USER (boleh dulu dicek / dilayani)
+  if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
+  if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
+  if (data.startsWith("OPEN_LINK_")) return user.openRandomLink(ctx);
+  if (data.startsWith("BUY_PRODUCT_")) return user.buyProduct(ctx);
+  if (data === "HELP_MENU") return user.helpMenu(ctx);
+  if (data === "HELP_VIDEO_SHOW") return user.showHelpVideo(ctx);
+
+  // Jika bukan admin → stop di sini
+  if (!isAdmin) {
+    return ctx.answerCbQuery("❌ Anda bukan admin.", { show_alert: true });
   }
+
+  // 👉 ROUTER ADMIN
+  if (data === "ADMIN_PANEL") return admin.showAdminMenu(ctx);
+
+  // ===== PRODUCTS
+  if (data === "ADMIN_ADD_PRODUCT") return admin.addProduct(ctx);
+  if (data === "ADMIN_EDIT_PRODUCT") return admin.showEditProductMenu(ctx);
+  if (data.startsWith("EDIT_PROD_")) return admin.handleSelectProductToEdit(ctx);
+  if (data === "ADMIN_DELETE_PRODUCT") return admin.showDeleteProductMenu(ctx);
+  if (data.startsWith("DEL_PROD_")) return admin.handleSelectDeleteProduct(ctx);
+  if (data.startsWith("CONFIRM_DEL_")) return admin.handleConfirmDeleteProduct(ctx);
+  if (data.startsWith("CANCEL_DEL_")) return admin.handleCancelDeleteProduct(ctx);
+
+  // ===== ORDERS
+  if (data === "ADMIN_LIST_ORDERS") return admin.listOrders(ctx);
+
+  // ===== PAYMENT CONFIRM
+  if (data === "ADMIN_CONFIRM_PAYMENT") return admin.confirmPayment(ctx);
+
+  // ===== SHIPPING
+  if (data === "ADMIN_SET_RESI") return admin.setResi(ctx);
+  if (data === "ADMIN_SET_STATUS") return admin.setStatus(ctx);
+
+  // ===== SETTINGS
+  if (data === "ADMIN_SET_GREETING") return admin.setGreeting(ctx);
+  if (data === "ADMIN_SET_PAYMENT") return admin.setPaymentInfo(ctx);
+  if (data === "ADMIN_SET_HELP") return admin.setHelpText(ctx);
+
+  // ===== LEGACY HELP VIDEO
+  if (data === "ADMIN_UPLOAD_VIDEO") return admin.uploadHelpVideo(ctx);
+  if (data === "ADMIN_DELETE_VIDEO") return admin.showDeleteHelpVideoMenu(ctx);
+  if (data.startsWith("DEL_HELP_VIDEO_")) return admin.handleDeleteHelpVideo(ctx);
+
+  // ===== BUTTON LABELS
+  if (data === "ADMIN_SET_BUTTONS") return admin.showSetButtonsMenu(ctx);
+  if (data.startsWith("ADMIN_SET_BTN_")) return admin.handleSelectButtonToEdit(ctx);
+
+  return admin.noop(ctx);
 });
 
-bot.action(/^OPEN_LINK_/, async (ctx) => {
-  try {
-    await userHandler.openRandomLink(ctx);
-  } catch (err) {
-    console.error('❌ OPEN_LINK error:', err);
-  }
+// ========================================
+// TEXT MESSAGE ROUTER
+// ========================================
+bot.on("text", async (ctx) => {
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+
+  // 👉 USER ORDER
+  if (ctx.session.orderStep) return user.handleOrderInput(ctx);
+
+  // 👉 ADMIN ONLY BELOW
+  if (!isAdmin) return;
+
+  // PRODUCT
+  if (ctx.session.awaitingAddProduct) return admin.handleAddProduct(ctx);
+  if (ctx.session.awaitingEditProduct) return admin.handleEditProduct(ctx);
+
+  // PAYMENT
+  if (ctx.session.awaitingConfirmOrder) return admin.handleConfirmPayment(ctx);
+
+  // SETTINGS
+  if (ctx.session.awaitingSetGreeting) return admin.handleSetGreetingText(ctx);
+  if (ctx.session.awaitingSetPayment) return admin.handleSetPaymentInfo(ctx);
+  if (ctx.session.awaitingSetHelp) return admin.handleSetHelpText(ctx);
+
+  // HELP VIDEO
+  if (ctx.session.awaitingHelpVideo) return admin.handleUploadHelpVideo(ctx);
+
+  // HELP CATEGORY
+  if (ctx.session.awaitingNewHelpCategory) return admin.saveNewHelpCategory(ctx);
+  if (ctx.session.awaitingHelpCategoryName) return admin.handleAddHelpCategoryName(ctx);
+  if (ctx.session.awaitingEditCategoryName) return admin.handleEditHelpCategoryName(ctx);
+  if (ctx.session.awaitingUploadHelpVideoToCategory)
+    return admin.handleUploadVideoToCategory_message(ctx);
+
+  // LEGACY
+  if (ctx.session.awaitingCategoryVideo)
+    return admin.handleUploadHelpDescription(ctx);
+
+  // BUTTON LABEL EDIT
+  if (ctx.session.awaitingSetButtonKey)
+    return admin.handleSetButtonLabel(ctx);
 });
 
-bot.action(/^BUY_PRODUCT_/, async (ctx) => {
-  try {
-    await userHandler.buyProduct(ctx);
-  } catch (err) {
-    console.error('❌ BUY_PRODUCT error:', err);
-  }
-});
+// ========================================
+// VIDEO MESSAGE ROUTER
+// ========================================
+bot.on("video", async (ctx) => {
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-bot.action('TRACK_ORDER', async (ctx) => {
-  try {
-    await userHandler.trackOrder(ctx);
-  } catch (err) {
-    console.error('❌ TRACK_ORDER error:', err);
-  }
-});
+  // USER tidak punya handler video → skip
+  if (!isAdmin) return;
 
-bot.command('tracking', async (ctx) => {
-  try {
-    await userHandler.trackOrder(ctx);
-  } catch (err) {
-    console.error('❌ /tracking error:', err);
-  }
-});
+  if (ctx.session.awaitingHelpVideo)
+    return admin.handleUploadHelpVideo(ctx);
 
-bot.action('HELP_MENU', async (ctx) => {
-  try {
-    await userHandler.helpMenu(ctx);
-  } catch (err) {
-    console.error('❌ HELP_MENU error:', err);
-  }
-});
-
-/* ===================================
-   🛠 ADMIN PANEL & ACTIONS
-=================================== */
-
-bot.action('ADMIN_PANEL', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('❌ Kamu bukan admin!');
-  try {
-    await adminHandler.showAdminMenu(ctx);
-  } catch (err) {
-    console.error('❌ ADMIN_PANEL error:', err);
-  }
-});
-
-bot.command('admin', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply('❌ Kamu bukan admin!');
-  try {
-    await adminHandler.showAdminMenu(ctx);
-  } catch (err) {
-    console.error('❌ /admin error:', err);
-  }
-});
-
-/* ============ ADMIN PRODUCT MENU ============ */
-
-bot.action('ADMIN_ADD_PRODUCT', (ctx) => adminHandler.addProduct(ctx));
-bot.action('ADMIN_EDIT_PRODUCT', (ctx) => adminHandler.showEditProductMenu(ctx));
-bot.action('ADMIN_DELETE_PRODUCT', (ctx) => adminHandler.showDeleteProductMenu(ctx));
-
-bot.action(/^EDIT_PROD_/, (ctx) => adminHandler.handleSelectProductToEdit(ctx));
-bot.action(/^DEL_PROD_/, (ctx) => adminHandler.handleSelectDeleteProduct(ctx));
-bot.action(/^CONFIRM_DEL_/, (ctx) => adminHandler.handleConfirmDeleteProduct(ctx));
-bot.action(/^CANCEL_DEL_/, (ctx) => adminHandler.handleCancelDeleteProduct(ctx));
-
-/* ============ ORDERS ============ */
-
-bot.action('ADMIN_LIST_ORDERS', (ctx) => adminHandler.listOrders(ctx));
-bot.action('ADMIN_CONFIRM_PAYMENT', (ctx) => adminHandler.confirmPayment(ctx));
-
-/* ============ RESI & STATUS ============ */
-
-bot.action('ADMIN_SET_RESI', (ctx) => adminHandler.setResi(ctx));
-bot.action('ADMIN_SET_STATUS', (ctx) => adminHandler.setStatus(ctx));
-
-/* ============ GREETING / PAYMENT / HELP ============ */
-
-bot.action('ADMIN_SET_GREETING', (ctx) => adminHandler.setGreeting(ctx));
-bot.action('ADMIN_SET_PAYMENT', (ctx) => adminHandler.setPaymentInfo(ctx));
-bot.action('ADMIN_SET_HELP', (ctx) => adminHandler.setHelpText(ctx));
-
-/* ============ BUTTON CUSTOMIZATION ============ */
-
-bot.action('ADMIN_SET_BUTTONS', (ctx) => adminHandler.showSetButtonsMenu(ctx));
-bot.action(/^ADMIN_SET_BTN_/, (ctx) => adminHandler.handleSelectButtonToEdit(ctx));
-
-/* ============ VIDEO UPLOAD ============ */
-
-bot.action('ADMIN_UPLOAD_VIDEO', (ctx) => adminHandler.uploadHelpVideo(ctx));
-bot.on('video', (ctx) => adminHandler.handleUploadHelpVideo(ctx));
-bot.command('done', (ctx) => adminHandler.handleUploadHelpVideo(ctx));
-
-/* ===================================
-   🧾 UPLOAD BUKTI BAYAR
-=================================== */
-bot.on('photo', (ctx) => {
-  try {
-    uploadHandler.handleUpload(ctx);
-  } catch (err) {
-    console.error('❌ Upload error:', err);
-  }
-});
-
-/* ===================================
-   📝 GLOBAL TEXT HANDLER
-=================================== */
-
-bot.on('text', async (ctx) => {
-  try {
-    if (ctx.session?.orderingProduct) return userHandler.handleOrderInput(ctx);
-    if (ctx.session?.awaitingAddProduct) return adminHandler.handleAddProduct(ctx);
-    if (ctx.session?.awaitingEditProduct) return adminHandler.handleEditProduct(ctx);
-    if (ctx.session?.awaitingSetGreeting) return adminHandler.handleSetGreetingText(ctx);
-    if (ctx.session?.awaitingSetPayment) return adminHandler.handleSetPaymentInfo(ctx);
-    if (ctx.session?.awaitingSetHelp) return adminHandler.handleSetHelpText(ctx);
-    if (ctx.session?.awaitingConfirmOrder) return adminHandler.handleConfirmPayment(ctx);
-    if (ctx.session?.awaitingSetButtonKey) return adminHandler.handleSetButtonLabel(ctx);
-
-    return fsmHandler.handleState(ctx);
-  } catch (err) {
-    console.error('❌ GLOBAL TEXT ERROR:', err);
-  }
-});
-
-/* ===================================
-   ⚠️ GLOBAL ERROR HANDLER
-=================================== */
-
-bot.catch((err) => {
-  console.error('❌ Unhandled bot error:', err);
+  if (ctx.session.awaitingUploadHelpVideoToCategory)
+    return admin.handleUploadVideoToCategory_message(ctx);
 });
 
 module.exports = bot;

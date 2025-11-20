@@ -19,61 +19,107 @@ async function getBtn(key) {
     BTN_OPEN_LINK: "🌐 Buka Link Acak",
     BTN_BACK: "⬅️ Kembali",
     BTN_BUY: "🛒 Beli Produk Ini",
+    BTN_HELP_VIDEO: "▶ Tonton Video Bantuan",
+    BTN_HELP: "❓ Bantuan",
   };
 
   return (await buttonService.getButtonLabel(key)) || defaultButtons[key];
 }
 
 module.exports = {
-  /* ============================
-      🏠 START COMMAND
-  ============================ */
-  async start(ctx, isAdmin = false) {
-    const greeting =
-      (await settingsService.getSetting('greeting')) ||
-      '👋 Selamat datang di toko kami!';
+/* ============================
+    🏠 START COMMAND
+============================ */
+async start(ctx, isAdmin = false) {
+  const greeting =
+    (await settingsService.getSetting('greeting')) ||
+    '👋 Selamat datang di toko kami!';
 
-    await ctx.reply(greeting, mainMenu(isAdmin));
-  },
+  await ctx.reply(greeting, await mainMenu(isAdmin));
+},
 
   /* ============================
         ❓ HELP MENU
   ============================ */
-  async helpMenu(ctx) {
-    try {
-      ctx.session ||= {};
-      if (ctx.callbackQuery) await ctx.answerCbQuery();
+ async helpMenu(ctx) {
+  try {
+    ctx.session ||= {};
+    if (ctx.callbackQuery) await ctx.answerCbQuery();
 
-      const help =
-        (await settingsService.getSetting('help')) ||
-        'Gunakan menu berikut untuk melihat produk, membeli, atau melacak pesanan.';
+    const help =
+      (await settingsService.getSetting('help')) ||
+      'Gunakan menu berikut untuk melihat produk, membeli, atau melacak pesanan.';
 
-      let helpVideos = (await settingsService.getSetting('help_videos')) || null;
+    let helpVideos = await settingsService.getSetting('help_videos');
 
-      await ctx.telegram.sendMessage(
-        ctx.chat.id,
-        `❓ *Bantuan*\n\n${help}`,
-        { parse_mode: 'Markdown' }
-      );
+    // Kirim teks bantuan dulu
+    const buttons = [];
 
-      if (!helpVideos) return;
-
+    // Jika ada video → munculkan tombol
+    if (helpVideos) {
       try {
         helpVideos = JSON.parse(helpVideos);
-        if (!Array.isArray(helpVideos)) helpVideos = [];
+        if (Array.isArray(helpVideos) && helpVideos.length > 0) {
+          buttons.push([
+            { text: await getBtn('BTN_HELP_VIDEO'), callback_data: "HELP_VIDEO_SHOW" }
+          ]);
+        }
       } catch {
-        helpVideos = [];
+        // ignore error parsing
       }
-
-      if (!helpVideos.length) return;
-
-      const randomFileId = helpVideos[Math.floor(Math.random() * helpVideos.length)];
-      await ctx.telegram.sendVideo(ctx.chat.id, randomFileId);
-    } catch (err) {
-      console.error('HELP MENU ERROR:', err);
-      await ctx.reply('❌ Gagal membuka menu bantuan.');
     }
-  },
+
+    return ctx.reply(
+      `❓ *Bantuan*\n\n${help}`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      }
+    );
+
+  } catch (err) {
+    console.error('HELP MENU ERROR:', err);
+    await ctx.reply('❌ Gagal membuka menu bantuan.');
+  }
+},
+
+async showHelpVideo(ctx) {
+  try {
+    if (ctx.callbackQuery) await ctx.answerCbQuery();
+
+    let helpVideos = await settingsService.getSetting('help_videos');
+    if (!helpVideos) {
+      return ctx.reply("❌ Tidak ada video bantuan yang tersedia.");
+    }
+
+    try {
+      helpVideos = JSON.parse(helpVideos);
+      if (!Array.isArray(helpVideos)) helpVideos = [];
+    } catch {
+      helpVideos = [];
+    }
+
+    if (helpVideos.length === 0) {
+      return ctx.reply("❌ Video bantuan kosong.");
+    }
+
+    // Ambil salah satu video
+    const randomVideo = helpVideos[Math.floor(Math.random() * helpVideos.length)];
+
+    const fileId = randomVideo.file_id || randomVideo;   // fallback jika format lama masih string
+    const caption = (randomVideo.caption && randomVideo.caption.trim())
+      ? randomVideo.caption
+      : "Video Tutorial";
+
+    await ctx.replyWithVideo(fileId, {
+      caption
+    });
+
+  } catch (err) {
+    console.error("HELP VIDEO ERROR:", err);
+    await ctx.reply("❌ Gagal memuat video bantuan.");
+  }
+},
 
   /* ============================
       🛒 VIEW PRODUCTS

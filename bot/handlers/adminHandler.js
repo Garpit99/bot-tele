@@ -1,4 +1,3 @@
-// adminHandler.js
 const productService = require('../../services/productService');
 const orderService = require('../../services/orderService');
 const settingsService = require('../../services/settingsService');
@@ -43,10 +42,14 @@ function sanitizeId(raw) {
    BUTTON DEFAULT CONSTANTS
 =========================== */
 const BUTTONS = {
+  //USER
   BTN_VIEW_PRODUCTS: "🛍️ Lihat Produk",
   BTN_OPEN_LINK: "🌐 Buka Link Acak",
   BTN_BACK: "⬅️ Kembali",
   BTN_BUY: "🛒 Beli Produk Ini",
+  BTN_HELP: "❓ Bantuan",
+  BTN_HELP_TEXT: "📄 Bantuan (Teks)",
+  BTN_HELP_VIDEO: "▶ Tonton Video Bantuan",
 
   // ADMIN
   BTN_ADMIN_ADD_PRODUCT: "➕ Tambah Produk",
@@ -60,6 +63,7 @@ const BUTTONS = {
   BTN_ADMIN_SET_PAYMENT: "💳 Ubah Rekening Pembayaran",
   BTN_ADMIN_SET_HELP: "❓ Ubah Text Bantuan",
   BTN_ADMIN_UPLOAD_VIDEO: "🎥 Upload Video Bantuan",
+  BTN_ADMIN_DELETE_VIDEO: "🗑 Hapus Video Bantuan",
   BTN_ADMIN_SET_BUTTONS: "🔧 Ubah Nama Tombol"
 };
 
@@ -96,6 +100,7 @@ async function showAdminMenu(ctx) {
       "BTN_ADMIN_SET_PAYMENT",
       "BTN_ADMIN_SET_HELP",
       "BTN_ADMIN_UPLOAD_VIDEO",
+      "BTN_ADMIN_DELETE_VIDEO",
       "BTN_ADMIN_SET_BUTTONS"
     ];
 
@@ -563,6 +568,9 @@ async function handleSetHelpText(ctx) {
   ctx.session.awaitingSetHelp = false;
 }
 
+/* ===========================
+   EXISTING SIMPLE HELP VIDEO UPLOAD (kept for backward compatibility)
+=========================== */
 async function uploadHelpVideo(ctx) {
   ctx.session ||= {};
   ctx.session.awaitingHelpVideo = true;
@@ -571,19 +579,117 @@ async function uploadHelpVideo(ctx) {
 
 async function handleUploadHelpVideo(ctx) {
   if (!ctx.session || !ctx.session.awaitingHelpVideo) return;
+
+  // Admin selesai
   if (ctx.message.text === '/done') {
     ctx.session.awaitingHelpVideo = false;
     return ctx.reply('✅ Semua video bantuan berhasil disimpan!');
   }
+
+  // Harus video
   if (!ctx.message.video) {
-    return ctx.reply('❌ Kirim VIDEO, bukan teks atau gambar.');
+    return ctx.reply('❌ Kirim VIDEO, bukan teks.');
   }
+
   const fileId = ctx.message.video.file_id;
+
+  // Ambil caption jika admin menulis caption di message
+  const caption = ctx.message.caption && ctx.message.caption.trim()
+    ? ctx.message.caption.trim()
+    : "";
+
+  // Ambil semua video yang sudah tersimpan
   let videos = await settingsService.getSetting('help_videos');
   videos = videos ? JSON.parse(videos) : [];
-  videos.push(fileId);
+
+  // Simpan sebagai objek lengkap
+  videos.push({
+    file_id: fileId,
+    caption: caption
+  });
+
   await settingsService.setSetting('help_videos', JSON.stringify(videos));
-  await ctx.reply('🎞 Video berhasil ditambahkan!');
+
+  await ctx.reply('🎞 Video + caption berhasil ditambahkan!');
+}
+
+/* ===========================
+   EXISTING SIMPLE HELP VIDEO DELETE (kept for backward compatibility)
+=========================== */
+async function showDeleteHelpVideoMenu(ctx) {
+  try {
+    let videos = await settingsService.getSetting('help_videos');
+    videos = videos ? JSON.parse(videos) : [];
+
+    if (!videos.length) {
+      return ctx.reply("📭 Tidak ada video bantuan.");
+    }
+
+    for (let i = 0; i < videos.length; i++) {
+      const fileId = videos[i];
+
+      await ctx.replyWithVideo(
+        fileId,
+        {
+          caption: `🎞 Video #${i + 1}`,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                Markup.button.callback(
+                  "🗑 Hapus Video Ini",
+                  `DEL_HELP_VIDEO_${i}`
+                )
+              ]
+            ]
+          }
+        }
+      );
+    }
+  } catch (e) {
+    console.error("showDeleteHelpVideoMenu error:", e);
+    await ctx.reply("❌ Gagal memuat daftar video bantuan.");
+  }
+}
+
+async function handleDeleteHelpVideo(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
+
+  const raw = ctx.callbackQuery.data;
+  const index = Number(raw.replace("DEL_HELP_VIDEO_", ""));
+
+  let videos = await settingsService.getSetting('help_videos');
+  videos = videos ? JSON.parse(videos) : [];
+
+  if (isNaN(index) || index < 0 || index >= videos.length) {
+    return ctx.reply("❌ Video tidak ditemukan.");
+  }
+
+  const removed = videos.splice(index, 1); // Hapus 1 video
+
+  await settingsService.setSetting('help_videos', JSON.stringify(videos));
+
+  await ctx.reply(`🗑 Video bantuan #${index + 1} berhasil dihapus!`);
+}
+
+/* ===========================
+   NEW: HELP CATEGORIES (A) - admin features
+   - stored in settingsService under key "help_categories"
+   - structure: { <id>: { title: string, videos: [ { file_id, caption, description } ] } }
+=========================== */
+
+async function _getHelpCategoriesObject() {
+  let raw = await settingsService.getSetting('help_categories');
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+async function _saveHelpCategoriesObject(obj) {
+  await settingsService.setSetting('help_categories', JSON.stringify(obj));
 }
 
 /* ===========================
@@ -620,7 +726,7 @@ module.exports = {
   setResi,
   setStatus,
 
-  // Greeting & help
+  // Greeting & help (simple)
   setGreeting,
   handleSetGreetingText,
 
@@ -630,6 +736,11 @@ module.exports = {
   setHelpText,
   handleSetHelpText,
 
+  // simple legacy video handlers
   uploadHelpVideo,
   handleUploadHelpVideo,
+  showDeleteHelpVideoMenu,
+  handleDeleteHelpVideo,
+
+  // NEW: help categories
 };
