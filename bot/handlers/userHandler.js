@@ -173,31 +173,48 @@ async showHelpVideo(ctx) {
   /* ============================
         🎲 RANDOM LINK
   ============================ */
-  async openRandomLink(ctx) {
-    ctx.session ||= {};
-    const client = getClient();
-    const id = ctx.callbackQuery.data.replace('OPEN_LINK_', '');
-    const randomLink = await client.sRandMember(`product_links:${id}`);
+async openRandomLink(ctx) {
+  ctx.session ||= {};
+  const client = getClient();
+  const id = ctx.callbackQuery.data.replace('OPEN_LINK_', '');
 
-    if (!randomLink)
-      return ctx.answerCbQuery('❌ Tidak ada link untuk produk ini.', { show_alert: true });
+  const randomLink = await client.sRandMember(`product_links:${id}`);
+  if (!randomLink) {
+    return ctx.answerCbQuery('❌ Tidak ada link untuk produk ini.');
+  }
 
-    const data = await client.hGetAll(`product:${id}`);
-    const newText = `🛍️ *${data.name}*\n💰 Harga: Rp${Number(data.price || 0).toLocaleString('id-ID')}\n📦 Stok: ${data.stock}\n📝 ${data.description || '-'}`;
+  const data = await client.hGetAll(`product:${id}`);
+  const newText =
+    `🛍️ *${data.name}*\n` +
+    `💰 Harga: Rp${Number(data.price || 0).toLocaleString('id-ID')}\n` +
+    `📦 Stok: ${data.stock}\n` +
+    `📝 ${data.description || '-'}`;
 
-    try {
-      const buttons = [
-        [{ text: await getBtn('BTN_OPEN_LINK'), callback_data: `OPEN_LINK_${id}` }],
-        [{ text: await getBtn('BTN_BACK'), callback_data: 'VIEW_PRODUCTS' }],
-      ];
-      await ctx.editMessageText(newText, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: buttons },
-      });
-    } catch {}
+  const buttons = [
+    [
+      {
+        text: await getBtn('BTN_OPEN_LINK'),
+        url: randomLink, // 🔥 langsung buka web
+      },
+    ],
+    [
+      {
+        text: await getBtn('BTN_BACK'),
+        callback_data: 'VIEW_PRODUCTS',
+      },
+    ],
+  ];
 
-    ctx.answerCbQuery(`🌐 Link acak:\n${randomLink}`, { show_alert: true });
-  },
+  try {
+    await ctx.editMessageText(newText, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: buttons },
+    });
+  } catch (e) {}
+
+  // ❌ jangan pakai alert / popup
+  await ctx.answerCbQuery();
+},
 
   /* ============================
       🛒 ORDER / BUY PRODUCT
