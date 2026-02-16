@@ -567,20 +567,7 @@ async function handleSetHelpText(ctx) {
   await ctx.reply('✅ Teks bantuan berhasil diperbarui!', { parse_mode: 'Markdown' });
   ctx.session.awaitingSetHelp = false;
 }
-/* ===========================
-   DELETE ALL HELP VIDEOS
-=========================== */
-async function deleteAllHelpVideos(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
 
-  try {
-    await settingsService.setSetting('help_videos', JSON.stringify([]));
-    await ctx.reply("🗑 Semua video bantuan berhasil dihapus!");
-  } catch (err) {
-    console.error("deleteAllHelpVideos error:", err);
-    await ctx.reply("❌ Gagal menghapus semua video.");
-  }
-}
 /* ===========================
    EXISTING SIMPLE HELP VIDEO UPLOAD (kept for backward compatibility)
 =========================== */
@@ -638,13 +625,28 @@ async function showDeleteHelpVideoMenu(ctx) {
       return ctx.reply("📭 Tidak ada video bantuan.");
     }
 
+    // 🔥 TOMBOL DELETE ALL DI ATAS
+    await ctx.reply("⚠️ Pilih video yang ingin dihapus atau hapus semua:", {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            Markup.button.callback(
+              "🗑 Hapus Semua Video",
+              "DELETE_ALL_HELP_VIDEOS"
+            )
+          ]
+        ]
+      }
+    });
+
+    // 🔥 List semua video
     for (let i = 0; i < videos.length; i++) {
-      const fileId = videos[i];
+      const videoObj = videos[i];
 
       await ctx.replyWithVideo(
-        fileId,
+        videoObj.file_id,
         {
-          caption: `🎞 Video #${i + 1}`,
+          caption: `🎞 Video #${i + 1}\n${videoObj.caption || ""}`,
           reply_markup: {
             inline_keyboard: [
               [
