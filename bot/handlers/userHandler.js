@@ -43,7 +43,7 @@ async start(ctx, isAdmin = false) {
   ============================ */
  async helpMenu(ctx) {
   try {
-    ctx.session ||= {};
+    if (!ctx.session) ctx.session = {};
     if (ctx.callbackQuery) await ctx.answerCbQuery();
 
     const help =
