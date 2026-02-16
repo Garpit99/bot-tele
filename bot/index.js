@@ -1,4 +1,9 @@
 require("dotenv").config();
+
+if (!process.env.BOT_TOKEN) {
+  console.error("❌ BOT_TOKEN belum diset di .env");
+  process.exit(1);
+}
 const { Telegraf } = require("telegraf");
 
 // PERBAIKAN 1: Gunakan path yang konsisten (plural) sesuai file yang kita buat sebelumnya
@@ -108,7 +113,7 @@ bot.on("callback_query", async (ctx) => {
   // ===== HELP VIDEO
   if (data === "ADMIN_UPLOAD_VIDEO") return admin.uploadHelpVideo(ctx);
   if (data === "ADMIN_DELETE_VIDEO") return admin.showDeleteHelpVideoMenu(ctx);
-  if (data.startsWith("DEL_HELP_VIDEO_")) return admin.handleDeleteHelpVideo(ctx);
+  if (data.startsWith("DEL_VIDEO_")) return admin.handleDeleteHelpVideo(ctx);
   // if (data === "DELETE_ALL_HELP_VIDEOS") return admin.deleteAllHelpVideos(ctx); // Hapus jika tidak ada fungsinya
 
   // ===== BUTTON LABELS
@@ -129,27 +134,66 @@ bot.on("callback_query", async (ctx) => {
 bot.on("text", async (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-  // USER Order
-  if (ctx.session.orderStep && user && user.handleOrderInput) return user.handleOrderInput(ctx);
+  // ===== EXIT CHAT ADMIN =====
+if (ctx.message.text === "/batal") {
+  ctx.session.chatAdmin = false;
+  return ctx.reply("❌ Chat admin ditutup.");
+}
+  // ===== USER CHAT ADMIN =====
+  if (ctx.session.chatAdmin) {
 
-  // ADMIN ONLY'
+  const now = Date.now();
+  if (ctx.session.lastMsg && now - ctx.session.lastMsg < 1000) {
+    return; // block spam < 1 detik
+  }
+  ctx.session.lastMsg = now;
+
+  const ADMIN_ID = ADMIN_IDS[0];
+  await ctx.telegram.forwardMessage(
+    ADMIN_ID,
+    ctx.chat.id,
+    ctx.message.message_id
+  );
+
+  return ctx.reply("📨 Pesan dikirim ke admin");
+}
+
+  // ===== USER ORDER FLOW =====
+  if (ctx.session.orderStep && user?.handleOrderInput) {
+    return user.handleOrderInput(ctx);
+  }
+
+  // ===== STOP JIKA BUKAN ADMIN =====
   if (!isAdmin) return;
 
-  if (ctx.session.awaitingAddProduct) return admin.handleAddProduct(ctx);
-  if (ctx.session.awaitingEditProduct) return admin.handleEditProduct(ctx);
-  if (ctx.session.awaitingConfirmOrder) return admin.handleConfirmPayment(ctx);
-  
-  if (ctx.session.awaitingSetGreeting) return admin.handleSetGreetingText(ctx);
-  if (ctx.session.awaitingSetPayment) return admin.handleSetPaymentInfo(ctx);
-  if (ctx.session.awaitingSetHelp) return admin.handleSetHelpText(ctx);
-  
-  if (ctx.session.awaitingHelpVideo) return admin.handleUploadHelpVideo(ctx);
-  
-  // Button Label Edit
-  if (ctx.session.awaitingSetButtonKey) return admin.handleSetButtonLabel(ctx);
-  
-  // Tambahkan handler lain jika ada (misal kategori help)
-  // ...
+  // ===== ADMIN SESSION HANDLERS =====
+  if (ctx.session.awaitingAddProduct)
+    return admin.handleAddProduct(ctx);
+
+  if (ctx.session.awaitingEditProduct)
+    return admin.handleEditProduct(ctx);
+
+  if (ctx.session.awaitingConfirmOrder)
+    return admin.handleConfirmPayment(ctx);
+
+  if (ctx.session.awaitingSetGreeting)
+    return admin.handleSetGreetingText(ctx);
+
+  if (ctx.session.awaitingSetPayment)
+    return admin.handleSetPaymentInfo(ctx);
+
+  if (ctx.session.awaitingSetHelp)
+    return admin.handleSetHelpText(ctx);
+
+  if (ctx.session.awaitingVideoCategory)
+    return admin.handleVideoCategory(ctx);
+
+
+  if (ctx.session.awaitingVideoUpload)
+    return admin.handleUploadHelpVideo(ctx);
+
+  if (ctx.session.awaitingSetButtonKey)
+    return admin.handleSetButtonLabel(ctx);
 });
 
 // ========================================
@@ -159,9 +203,7 @@ bot.on("video", async (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
   if (!isAdmin) return;
 
-  if (ctx.session.awaitingHelpVideo) return admin.handleUploadHelpVideo(ctx);
-  
-  // Tambahkan handler upload video kategori jika ada
+  if (ctx.session.awaitingVideoUpload) return admin.handleUploadHelpVideo(ctx);
 });
 
 // ========================================
@@ -171,6 +213,23 @@ bot.on("video", async (ctx) => {
 // Handle stop signal (untuk docker/cloud)
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// ===== ADMIN REPLY TO USER =====
+bot.on("message", async (ctx, next) => {
+  if (ctx.updateType !== "message") return next();
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+  if (!isAdmin) return;
+  if (!ctx.message.reply_to_message) return;
+  if (!ctx.message.reply_to_message.forward_from) return;
+
+  const userId = ctx.message.reply_to_message.forward_from.id;
+
+  await ctx.telegram.copyMessage(
+  userId,
+  ctx.chat.id,
+  ctx.message.message_id
+);
+});
 
 module.exports = bot;
 
