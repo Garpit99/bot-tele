@@ -145,7 +145,7 @@ async showHelpVideo(ctx) {
        📖 PRODUCT DETAIL
   ============================ */
   async viewProductDetail(ctx) {
-    ctx.session ||= {};
+    if (!ctx.session) ctx.session = {};
     const client = getClient();
     const id = ctx.callbackQuery.data.replace('VIEW_DETAIL_', '');
     const data = await client.hGetAll(`product:${id}`);
@@ -239,7 +239,7 @@ async openRandomLink(ctx) {
   },
 
   async handleOrderInput(ctx) {
-    ctx.session ||= {};
+    if (!ctx.session) ctx.session = {};
     if (!ctx.session.orderingProduct) return;
 
     const step = ctx.session.orderStep;
