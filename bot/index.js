@@ -95,6 +95,7 @@ bot.on("callback_query", async (ctx) => {
   if (data === "ADMIN_UPLOAD_VIDEO") return admin.uploadHelpVideo(ctx);
   if (data === "ADMIN_DELETE_VIDEO") return admin.showDeleteHelpVideoMenu(ctx);
   if (data.startsWith("DEL_HELP_VIDEO_")) return admin.handleDeleteHelpVideo(ctx);
+  if (data === "DELETE_ALL_HELP_VIDEOS") return admin.deleteAllHelpVideos(ctx);
 
   // ===== BUTTON LABELS
   if (data === "ADMIN_SET_BUTTONS") return admin.showSetButtonsMenu(ctx);
