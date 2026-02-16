@@ -567,7 +567,20 @@ async function handleSetHelpText(ctx) {
   await ctx.reply('✅ Teks bantuan berhasil diperbarui!', { parse_mode: 'Markdown' });
   ctx.session.awaitingSetHelp = false;
 }
+/* ===========================
+   DELETE ALL HELP VIDEOS
+=========================== */
+async function deleteAllHelpVideos(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
 
+  try {
+    await settingsService.setSetting('help_videos', JSON.stringify([]));
+    await ctx.reply("🗑 Semua video bantuan berhasil dihapus!");
+  } catch (err) {
+    console.error("deleteAllHelpVideos error:", err);
+    await ctx.reply("❌ Gagal menghapus semua video.");
+  }
+}
 /* ===========================
    EXISTING SIMPLE HELP VIDEO UPLOAD (kept for backward compatibility)
 =========================== */
