@@ -428,10 +428,17 @@ async function showHelpMenu(ctx) {
 async function handleHelpChoice(ctx) {
   await ctx.answerCbQuery().catch(() => {});
   const data = ctx.callbackQuery.data;
+
   if (data === "HELP_VIDEO") {
-     await ctx.reply("📂 Pilih kategori...");
-  } else if (data === "HELP_CHAT_ADMIN") {
-     await ctx.reply("💬 Chat: https://t.me/Admin");
+     await showHelpVideo(ctx); // panggil function kamu
+  }
+
+  else if (data === "HELP_CHAT_ADMIN") {
+     const adminText =
+       (await settingsService.getSetting("admin_chat_text")) ||
+       "💬 Silakan hubungi admin.";
+
+     await ctx.reply(adminText);
   }
 }
 
