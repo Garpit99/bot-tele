@@ -767,6 +767,6 @@ module.exports = {
   handleUploadHelpVideo,
   showDeleteHelpVideoMenu,
   handleDeleteHelpVideo,
-
+  deleteAllHelpVideos,
   // NEW: help categories
 };
