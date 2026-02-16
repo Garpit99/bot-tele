@@ -77,7 +77,7 @@ async start(ctx, isAdmin = false) {
     console.error('HELP MENU ERROR:', err);
     await ctx.reply('❌ Gagal membuka menu bantuan.');
   }
-}
+},
 async showHelpVideo(ctx) {
   try {
     if (ctx.callbackQuery) await ctx.answerCbQuery();
