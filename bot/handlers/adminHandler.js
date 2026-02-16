@@ -638,13 +638,28 @@ async function showDeleteHelpVideoMenu(ctx) {
       return ctx.reply("📭 Tidak ada video bantuan.");
     }
 
+    // 🔥 TOMBOL DELETE ALL DI ATAS
+    await ctx.reply("⚠️ Pilih video yang ingin dihapus atau hapus semua:", {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            Markup.button.callback(
+              "🗑 Hapus Semua Video",
+              "DELETE_ALL_HELP_VIDEOS"
+            )
+          ]
+        ]
+      }
+    });
+
+    // 🔥 List semua video
     for (let i = 0; i < videos.length; i++) {
-      const fileId = videos[i];
+      const videoObj = videos[i];
 
       await ctx.replyWithVideo(
-        fileId,
+        videoObj.file_id,
         {
-          caption: `🎞 Video #${i + 1}`,
+          caption: `🎞 Video #${i + 1}\n${videoObj.caption || ""}`,
           reply_markup: {
             inline_keyboard: [
               [
@@ -661,40 +676,6 @@ async function showDeleteHelpVideoMenu(ctx) {
   } catch (e) {
     console.error("showDeleteHelpVideoMenu error:", e);
     await ctx.reply("❌ Gagal memuat daftar video bantuan.");
-  }
-}
-
-async function handleDeleteHelpVideo(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
-
-  const raw = ctx.callbackQuery.data;
-  const index = Number(raw.replace("DEL_HELP_VIDEO_", ""));
-
-  let videos = await settingsService.getSetting('help_videos');
-  videos = videos ? JSON.parse(videos) : [];
-
-  if (isNaN(index) || index < 0 || index >= videos.length) {
-    return ctx.reply("❌ Video tidak ditemukan.");
-  }
-
-  const removed = videos.splice(index, 1); // Hapus 1 video
-
-  await settingsService.setSetting('help_videos', JSON.stringify(videos));
-
-  await ctx.reply(`🗑 Video bantuan #${index + 1} berhasil dihapus!`);
-}
-/* ===========================
-   DELETE ALL HELP VIDEOS
-=========================== */
-async function deleteAllHelpVideos(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
-
-  try {
-    await settingsService.setSetting('help_videos', JSON.stringify([]));
-    await ctx.reply("🗑 Semua video bantuan berhasil dihapus!");
-  } catch (err) {
-    console.error("deleteAllHelpVideos error:", err);
-    await ctx.reply("❌ Gagal menghapus semua video.");
   }
 }
 /* ===========================
