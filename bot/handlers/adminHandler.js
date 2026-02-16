@@ -792,6 +792,11 @@ module.exports = {
   handleUploadHelpVideo,
   showDeleteHelpVideoMenu,
   handleDeleteHelpVideo,
+   
 
   // NEW: help categories
+   showHelpMenu,
+   handleHelpChoice,
+   
 };
+   
