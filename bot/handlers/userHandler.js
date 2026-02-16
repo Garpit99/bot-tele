@@ -73,7 +73,7 @@ async start(ctx, isAdmin = false) {
       `❓ *Bantuan*\n\n${help}`,
       {
         parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: buttons }
+        reply_markup: { inline_keyboard: ctx.session ||= {}; }
       }
     );
 
@@ -174,7 +174,7 @@ async showHelpVideo(ctx) {
         🎲 RANDOM LINK
   ============================ */
 async openRandomLink(ctx) {
-  ctx.session ||= {};
+  if (!ctx.session) ctx.session = {};
   const client = getClient();
   const id = ctx.callbackQuery.data.replace('OPEN_LINK_', '');
 
@@ -220,7 +220,7 @@ async openRandomLink(ctx) {
       🛒 ORDER / BUY PRODUCT
   ============================ */
   async buyProduct(ctx) {
-    ctx.session ||= {};
+    if (!ctx.session) ctx.session = {};
     const client = getClient();
     const id = ctx.callbackQuery.data.replace('BUY_PRODUCT_', '');
     const data = await client.hGetAll(`product:${id}`);
