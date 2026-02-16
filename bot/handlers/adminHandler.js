@@ -683,7 +683,20 @@ async function handleDeleteHelpVideo(ctx) {
 
   await ctx.reply(`🗑 Video bantuan #${index + 1} berhasil dihapus!`);
 }
+/* ===========================
+   DELETE ALL HELP VIDEOS
+=========================== */
+async function deleteAllHelpVideos(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
 
+  try {
+    await settingsService.setSetting('help_videos', JSON.stringify([]));
+    await ctx.reply("🗑 Semua video bantuan berhasil dihapus!");
+  } catch (err) {
+    console.error("deleteAllHelpVideos error:", err);
+    await ctx.reply("❌ Gagal menghapus semua video.");
+  }
+}
 /* ===========================
    NEW: HELP CATEGORIES (A) - admin features
    - stored in settingsService under key "help_categories"
