@@ -626,12 +626,12 @@ async function showDeleteHelpVideoMenu(ctx) {
     }
 
     for (let i = 0; i < videos.length; i++) {
-      const fileId = videos[i];
+      const video = videos[i];
 
       await ctx.replyWithVideo(
-        fileId,
+        video.file_id,
         {
-          caption: `🎞 Video #${i + 1}`,
+          caption: `🎞 Video #${i + 1}\n${video.caption || ''}`,
           reply_markup: {
             inline_keyboard: [
               [
