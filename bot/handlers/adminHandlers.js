@@ -385,8 +385,7 @@ async function setStatus(ctx) {
   await ctx.reply('🔄 Kirim: `ORD-xxx|status`', { parse_mode: 'Markdown' });
 }
 
-const settingsService = require("../../services/settingsService");
-const { Markup } = require("telegraf");
+
 
 /* =========================
    HELP MENU USER
@@ -436,23 +435,44 @@ async function uploadHelpVideo(ctx){
 
 async function handleVideoCategory(ctx){
   if(!ctx.session?.awaitingVideoCategory) return;
-  ctx.session.videoCategory = ctx.message.text.toLowerCase();
+
+  const category = ctx.message.text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .trim();
+
+  if (!category) {
+    return ctx.reply("❌ Nama kategori tidak valid. Kirim ulang.");
+  }
+
+  ctx.session.videoCategory = category;
   ctx.session.awaitingVideoCategory = false;
   ctx.session.awaitingVideoUpload = true;
+
   ctx.reply("🎥 Sekarang kirim videonya.");
 }
 
-async function handleUploadHelpVideo(ctx){
-  if(!ctx.session?.awaitingVideoUpload) return;
-  if(!ctx.message.video) return ctx.reply("❌ Kirim video.");
+async function handleUploadHelpVideo(ctx) {
+  if (!ctx.session?.awaitingVideoUpload) return;
+  if (!ctx.message.video) return ctx.reply("❌ Kirim video.");
 
   const category = ctx.session.videoCategory;
+  if (!category) {
+    ctx.session.awaitingVideoUpload = false;
+    return ctx.reply("❌ Kategori tidak ditemukan. Ulangi /uploadvideo.");
+  }
+
   const fileId = ctx.message.video.file_id;
 
-  let data = await settingsService.getSetting("help_videos");
-  try { data = data ? JSON.parse(data) : {}; } catch { data = {}; }
+  let raw = await settingsService.getSetting("help_videos");
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = {};
+  }
 
-  if(!data[category]) data[category] = [];
+  if (!data[category]) data[category] = [];
 
   data[category].push({
     file_id: fileId,
@@ -461,10 +481,14 @@ async function handleUploadHelpVideo(ctx){
 
   await settingsService.setSetting("help_videos", JSON.stringify(data));
 
+  // CLEAR SESSION
   ctx.session.awaitingVideoUpload = false;
-  ctx.reply(`✅ Video masuk kategori *${category}*`,{parse_mode:"Markdown"});
-}
+  ctx.session.videoCategory = null;
 
+  await ctx.reply(`✅ Video masuk kategori *${category}*`, {
+    parse_mode: "Markdown"
+  });
+}
 /* =========================
    DELETE VIDEO
 ========================= */
@@ -479,7 +503,7 @@ async function showDeleteHelpVideoMenu(ctx){
         caption:`${cat} #${i}`,
         reply_markup:{
           inline_keyboard:[
-            [Markup.button.callback("🗑 Hapus",`DEL_VIDEO_${cat}_${i}`)]
+            [Markup.button.callback("🗑 Hapus",`DEL_VIDEO_${encodeURIComponent(cat)}_${i}`)]
           ]
         }
       });
@@ -489,15 +513,24 @@ async function showDeleteHelpVideoMenu(ctx){
 
 async function handleDeleteHelpVideo(ctx){
   const key = ctx.callbackQuery.data.replace("DEL_VIDEO_","");
-  const [cat,index] = key.split("_");
+  const parts = key.split("_");
+  const index = parseInt(parts.pop());
+  const cat = decodeURIComponent(parts.join("_"));
 
-  let data = JSON.parse(await settingsService.getSetting("help_videos") || "{}");
+  let raw = await settingsService.getSetting("help_videos");
+  let data = {};
+  try { data = JSON.parse(raw || "{}"); } catch {}
+
+  if (!data[cat] || !data[cat][index]) {
+    return ctx.answerCbQuery("❌ Video tidak ditemukan", { show_alert: true });
+  }
 
   data[cat].splice(index,1);
+
   await settingsService.setSetting("help_videos", JSON.stringify(data));
 
-  ctx.answerCbQuery("Dihapus");
-  ctx.reply("🗑 Video dihapus");
+  await ctx.answerCbQuery("Dihapus");
+  await ctx.reply("🗑 Video dihapus");
 }
 
 /* =========================
