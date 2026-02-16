@@ -39,80 +39,65 @@ async start(ctx, isAdmin = false) {
 },
 
   /* ============================
-        ❓ HELP MENU
-  ============================ */
- async helpMenu(ctx) {
+      ❓ HELP MENU
+============================ */
+async helpMenu(ctx) {
   try {
-    if (!ctx.session) ctx.session = {};
     if (ctx.callbackQuery) await ctx.answerCbQuery();
 
-    const help =
-      (await settingsService.getSetting('help')) ||
-      'Gunakan menu berikut untuk melihat produk, membeli, atau melacak pesanan.';
+    const intro =
+      (await settingsService.getSetting("help_intro")) ||
+      "Silakan pilih bantuan di bawah ini.";
 
-    let helpVideos = await settingsService.getSetting('help_videos');
-
-    const buttons = [];
-
-    if (helpVideos) {
-      try {
-        helpVideos = JSON.parse(helpVideos);
-        if (Array.isArray(helpVideos) && helpVideos.length > 0) {
-          buttons.push([
-            { text: await getBtn('BTN_HELP_VIDEO'), callback_data: "HELP_VIDEO_SHOW" }
-          ]);
+    const buttons = [
+      [
+        {
+          text: "🎥 Video Tutorial Checkout",
+          callback_data: "HELP_VIDEO_CHECKOUT"
         }
-      } catch {}
-    }
+      ],
+      [
+        {
+          text: "💬 Chat Admin",
+          callback_data: "HELP_CHAT_ADMIN"
+        }
+      ]
+    ];
 
     return ctx.reply(
-      `❓ *Bantuan*\n\n${help}`,
+      `❓ *Bantuan*\n\n${intro}`,
       {
-        parse_mode: 'Markdown',
+        parse_mode: "Markdown",
         reply_markup: { inline_keyboard: buttons }
       }
     );
-
   } catch (err) {
-    console.error('HELP MENU ERROR:', err);
-    await ctx.reply('❌ Gagal membuka menu bantuan.');
+    console.error(err);
+    await ctx.reply("❌ Gagal membuka menu bantuan.");
   }
 },
-async showHelpVideo(ctx) {
+
+/* ============================
+    🎥 SHOW CHECKOUT VIDEO
+============================ */
+async showCheckoutVideo(ctx) {
   try {
     if (ctx.callbackQuery) await ctx.answerCbQuery();
 
-    let helpVideos = await settingsService.getSetting('help_videos');
-    if (!helpVideos) {
-      return ctx.reply("❌ Tidak ada video bantuan yang tersedia.");
-    }
+    const raw = await settingsService.getSetting("help_checkout_video");
+    if (!raw) return ctx.reply("❌ Video belum diset admin.");
 
-    try {
-      helpVideos = JSON.parse(helpVideos);
-      if (!Array.isArray(helpVideos)) helpVideos = [];
-    } catch {
-      helpVideos = [];
-    }
+    const data = JSON.parse(raw);
 
-    if (helpVideos.length === 0) {
-      return ctx.reply("❌ Video bantuan kosong.");
-    }
+    if (!data.file_id)
+      return ctx.reply("❌ Video belum tersedia.");
 
-    // Ambil salah satu video
-    const randomVideo = helpVideos[Math.floor(Math.random() * helpVideos.length)];
-
-    const fileId = randomVideo.file_id || randomVideo;   // fallback jika format lama masih string
-    const caption = (randomVideo.caption && randomVideo.caption.trim())
-      ? randomVideo.caption
-      : "Video Tutorial";
-
-    await ctx.replyWithVideo(fileId, {
-      caption
+    await ctx.replyWithVideo(data.file_id, {
+      caption: data.caption || "🎥 Tutorial Checkout"
     });
-
   } catch (err) {
-    console.error("HELP VIDEO ERROR:", err);
-    await ctx.reply("❌ Gagal memuat video bantuan.");
+    console.error(err);
+    ctx.reply("❌ Gagal menampilkan video.");
   }
 },
 
