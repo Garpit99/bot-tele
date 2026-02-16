@@ -52,10 +52,8 @@ async start(ctx, isAdmin = false) {
 
     let helpVideos = await settingsService.getSetting('help_videos');
 
-    // Kirim teks bantuan dulu
     const buttons = [];
 
-    // Jika ada video → munculkan tombol
     if (helpVideos) {
       try {
         helpVideos = JSON.parse(helpVideos);
@@ -64,25 +62,22 @@ async start(ctx, isAdmin = false) {
             { text: await getBtn('BTN_HELP_VIDEO'), callback_data: "HELP_VIDEO_SHOW" }
           ]);
         }
-      } catch {
-        // ignore error parsing
-      }
+      } catch {}
     }
 
     return ctx.reply(
-  '❓ *Bantuan*\n\n${help}`,
-  {
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  }
-);
+      `❓ *Bantuan*\n\n${help}`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      }
+    );
 
   } catch (err) {
     console.error('HELP MENU ERROR:', err);
     await ctx.reply('❌ Gagal membuka menu bantuan.');
   }
-},
-
+}
 async showHelpVideo(ctx) {
   try {
     if (ctx.callbackQuery) await ctx.answerCbQuery();
