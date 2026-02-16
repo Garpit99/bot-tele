@@ -442,6 +442,43 @@ async function handleHelpChoice(ctx) {
   }
 }
 
+async uploadHelpVideo(ctx) {
+  try {
+    if (!ctx.message.video) {
+      return ctx.reply("❌ Kirim video yang ingin dijadikan tutorial.");
+    }
+
+    const fileId = ctx.message.video.file_id;
+
+    // Ambil data lama
+    let videos = await settingsService.getSetting('help_videos');
+    try {
+      videos = videos ? JSON.parse(videos) : [];
+    } catch {
+      videos = [];
+    }
+
+    videos.push({
+      file_id: fileId,
+      caption: ctx.message.caption || ""
+    });
+
+    await settingsService.setSetting('help_videos', JSON.stringify(videos));
+
+    ctx.reply("✅ Video tutorial berhasil ditambahkan!");
+
+  } catch (err) {
+    console.error("UPLOAD HELP VIDEO ERROR:", err);
+    ctx.reply("❌ Gagal menyimpan video.");
+  }
+}
+
+async setAdminText(ctx) {
+  const text = ctx.message.text.replace("/setadmintext ", "");
+  await settingsService.setSetting("admin_chat_text", text);
+  ctx.reply("✅ Teks chat admin diperbarui.");
+}
+
 /* ===========================
    EXPORT
 =========================== */
