@@ -167,10 +167,10 @@ bot.on("video", async (ctx) => {
 // ========================================
 // START BOT (WAJIB)
 // ========================================
-module.exports = bot;
-}).catch((err) => {
-  console.error("❌ Bot gagal start:", err);
-});
+bot.launch()
+  .then(() => console.log("✅ Bot berhasil start"))
+  .catch((err) => console.error("❌ Bot gagal start:", err));
+
 
 // Handle stop signal (untuk docker/cloud)
 process.once('SIGINT', () => bot.stop('SIGINT'));
