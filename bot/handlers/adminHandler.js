@@ -625,28 +625,13 @@ async function showDeleteHelpVideoMenu(ctx) {
       return ctx.reply("📭 Tidak ada video bantuan.");
     }
 
-    // 🔥 TOMBOL DELETE ALL DI ATAS
-    await ctx.reply("⚠️ Pilih video yang ingin dihapus atau hapus semua:", {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            Markup.button.callback(
-              "🗑 Hapus Semua Video",
-              "DELETE_ALL_HELP_VIDEOS"
-            )
-          ]
-        ]
-      }
-    });
-
-    // 🔥 List semua video
     for (let i = 0; i < videos.length; i++) {
-      const videoObj = videos[i];
+      const fileId = videos[i];
 
       await ctx.replyWithVideo(
-        videoObj.file_id,
+        fileId,
         {
-          caption: `🎞 Video #${i + 1}\n${videoObj.caption || ""}`,
+          caption: `🎞 Video #${i + 1}`,
           reply_markup: {
             inline_keyboard: [
               [
@@ -664,6 +649,26 @@ async function showDeleteHelpVideoMenu(ctx) {
     console.error("showDeleteHelpVideoMenu error:", e);
     await ctx.reply("❌ Gagal memuat daftar video bantuan.");
   }
+}
+
+async function handleDeleteHelpVideo(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
+
+  const raw = ctx.callbackQuery.data;
+  const index = Number(raw.replace("DEL_HELP_VIDEO_", ""));
+
+  let videos = await settingsService.getSetting('help_videos');
+  videos = videos ? JSON.parse(videos) : [];
+
+  if (isNaN(index) || index < 0 || index >= videos.length) {
+    return ctx.reply("❌ Video tidak ditemukan.");
+  }
+
+  const removed = videos.splice(index, 1); // Hapus 1 video
+
+  await settingsService.setSetting('help_videos', JSON.stringify(videos));
+
+  await ctx.reply(`🗑 Video bantuan #${index + 1} berhasil dihapus!`);
 }
 
 /* ===========================
@@ -736,7 +741,6 @@ module.exports = {
   handleUploadHelpVideo,
   showDeleteHelpVideoMenu,
   handleDeleteHelpVideo,
-  deleteAllHelpVideos,
-  
+
   // NEW: help categories
 };
