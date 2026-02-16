@@ -665,6 +665,7 @@ async function showDeleteHelpVideoMenu(ctx) {
     await ctx.reply("❌ Gagal memuat daftar video bantuan.");
   }
 }
+
 /* ===========================
    NEW: HELP CATEGORIES (A) - admin features
    - stored in settingsService under key "help_categories"
@@ -736,5 +737,6 @@ module.exports = {
   showDeleteHelpVideoMenu,
   handleDeleteHelpVideo,
   deleteAllHelpVideos,
+  
   // NEW: help categories
 };
