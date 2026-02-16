@@ -70,12 +70,12 @@ async start(ctx, isAdmin = false) {
     }
 
     return ctx.reply(
-      `❓ *Bantuan*\n\n${help}`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: ctx.session ||= {}; }
-      }
-    );
+  '❓ *Bantuan*\n\n${help}`,
+  {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: buttons }
+  }
+);
 
   } catch (err) {
     console.error('HELP MENU ERROR:', err);
