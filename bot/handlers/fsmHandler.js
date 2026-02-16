@@ -16,7 +16,7 @@ function sendToAdminOnce(ctx, adminId, message) {
 }
 
 async function handleState(ctx) {
-  ctx.session ||= {};
+  if (!ctx.session) ctx.session = {};
   const text = ctx.message?.text?.trim();
   if (!text) return;
 
