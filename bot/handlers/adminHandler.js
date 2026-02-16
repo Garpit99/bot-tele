@@ -638,28 +638,13 @@ async function showDeleteHelpVideoMenu(ctx) {
       return ctx.reply("📭 Tidak ada video bantuan.");
     }
 
-    // 🔥 TOMBOL DELETE ALL DI ATAS
-    await ctx.reply("⚠️ Pilih video yang ingin dihapus atau hapus semua:", {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            Markup.button.callback(
-              "🗑 Hapus Semua Video",
-              "DELETE_ALL_HELP_VIDEOS"
-            )
-          ]
-        ]
-      }
-    });
-
-    // 🔥 List semua video
     for (let i = 0; i < videos.length; i++) {
-      const videoObj = videos[i];
+      const fileId = videos[i];
 
       await ctx.replyWithVideo(
-        videoObj.file_id,
+        fileId,
         {
-          caption: `🎞 Video #${i + 1}\n${videoObj.caption || ""}`,
+          caption: `🎞 Video #${i + 1}`,
           reply_markup: {
             inline_keyboard: [
               [
