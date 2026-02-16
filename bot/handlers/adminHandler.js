@@ -693,6 +693,57 @@ async function _saveHelpCategoriesObject(obj) {
 }
 
 /* ===========================
+   HELP MENU BARU (VIDEO / CHAT ADMIN)
+=========================== */
+async function showHelpMenu(ctx) {
+  const keyboard = [
+    [Markup.button.callback("▶ Video Bantuan", "HELP_VIDEO")],
+    [Markup.button.callback("💬 Chat Admin", "HELP_CHAT_ADMIN")]
+  ];
+
+  await ctx.reply("❓ Pilih jenis bantuan:", {
+    reply_markup: { inline_keyboard: keyboard }
+  });
+}
+
+async function handleHelpChoice(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
+
+  const data = ctx.callbackQuery.data;
+
+  if (data === "HELP_VIDEO") {
+    // Ambil kategori video
+    const categories = await _getHelpCategoriesObject();
+    const buttons = Object.keys(categories).map(id => 
+      [Markup.button.callback(categories[id].title, `HELP_VIDEO_CAT_${id}`)]
+    );
+    buttons.push([Markup.button.callback("⬅️ Kembali", "HELP_MENU")]);
+
+    await ctx.reply("📂 Pilih kategori video:", {
+      reply_markup: { inline_keyboard: buttons }
+    });
+
+  } else if (data === "HELP_CHAT_ADMIN") {
+    // Kirim info chat admin
+    await ctx.reply("💬 Silakan chat admin melalui link berikut:\nhttps://t.me/NamaAdmin");
+  } else if (data.startsWith("HELP_VIDEO_CAT_")) {
+    const catId = data.replace("HELP_VIDEO_CAT_", "");
+    const categories = await _getHelpCategoriesObject();
+    const cat = categories[catId];
+    if (!cat || !cat.videos.length) return ctx.reply("❌ Tidak ada video di kategori ini.");
+
+    for (const video of cat.videos) {
+      await ctx.replyWithVideo(video.file_id, {
+        caption: video.caption || "",
+        reply_markup: {
+          inline_keyboard: [[Markup.button.callback("⬅️ Kembali", "HELP_VIDEO")]]
+        }
+      });
+    }
+  }
+}
+
+/* ===========================
    EXPORT
 =========================== */
 module.exports = {
