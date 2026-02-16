@@ -163,4 +163,15 @@ bot.on("video", async (ctx) => {
     return admin.handleUploadVideoToCategory_message(ctx);
 });
 
+// ========================================
+// Help Menu
+// ========================================
+const helpHandlers = require('./handlers/adminHandlers'); // sesuaikan path
+
+// Tombol utama Help
+bot.command("help", helpHandlers.showHelpMenu);
+bot.action("HELP_MENU", helpHandlers.showHelpMenu);
+
+// Semua callback yang diawali HELP_
+bot.action(/HELP_/, helpHandlers.handleHelpChoice);
 module.exports = bot;
