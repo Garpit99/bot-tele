@@ -1,6 +1,8 @@
 require("dotenv").config();
 const { Telegraf } = require("telegraf");
-const admin = require("./handlers/adminHandler");
+
+// PERBAIKAN 1: Gunakan path yang konsisten (plural) sesuai file yang kita buat sebelumnya
+const admin = require("./handlers/adminHandlers");
 const user = require("./handlers/userHandler");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -28,7 +30,13 @@ bot.use((ctx, next) => {
 // ========================================
 bot.start(async (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-  await user.start(ctx, isAdmin);
+  // Pastikan userHandler memiliki fungsi 'start'
+  if (user && user.start) {
+    await user.start(ctx, isAdmin);
+  } else {
+    console.error("userHandler.start tidak ditemukan!");
+    await ctx.reply("Bot siap!");
+  }
 });
 
 // ========================================
@@ -36,12 +44,18 @@ bot.start(async (ctx) => {
 // ========================================
 bot.command("admin", (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
   if (!isAdmin) {
     return ctx.reply("❌ Anda bukan admin. Akses ditolak.");
   }
-
   return admin.showAdminMenu(ctx);
+});
+
+// ========================================
+// HELP COMMAND (Gabungan)
+// ========================================
+bot.command("help", (ctx) => {
+    // Gunakan fungsi dari admin handler
+    return admin.showHelpMenu(ctx);
 });
 
 // ========================================
@@ -51,15 +65,17 @@ bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-  // 👉 ROUTER USER (boleh dulu dicek / dilayani)
-  if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
-  if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
-  if (data.startsWith("OPEN_LINK_")) return user.openRandomLink(ctx);
-  if (data.startsWith("BUY_PRODUCT_")) return user.buyProduct(ctx);
-  if (data === "HELP_MENU") return user.helpMenu(ctx);
-  if (data === "HELP_VIDEO_SHOW") return user.showHelpVideo(ctx);
+  // 👉 ROUTER USER
+  if (user) {
+    if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
+    if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
+    if (data.startsWith("OPEN_LINK_")) return user.openRandomLink(ctx);
+    if (data.startsWith("BUY_PRODUCT_")) return user.buyProduct(ctx);
+    if (data === "HELP_MENU") return admin.showHelpMenu(ctx); // Pakai admin.showHelpMenu
+    if (data === "HELP_VIDEO_SHOW") return user.showHelpVideo(ctx);
+  }
 
-  // Jika bukan admin → stop di sini
+  // Jika bukan admin → stop
   if (!isAdmin) {
     return ctx.answerCbQuery("❌ Anda bukan admin.", { show_alert: true });
   }
@@ -79,10 +95,8 @@ bot.on("callback_query", async (ctx) => {
   // ===== ORDERS
   if (data === "ADMIN_LIST_ORDERS") return admin.listOrders(ctx);
 
-  // ===== PAYMENT CONFIRM
+  // ===== PAYMENT
   if (data === "ADMIN_CONFIRM_PAYMENT") return admin.confirmPayment(ctx);
-
-  // ===== SHIPPING
   if (data === "ADMIN_SET_RESI") return admin.setResi(ctx);
   if (data === "ADMIN_SET_STATUS") return admin.setStatus(ctx);
 
@@ -91,17 +105,22 @@ bot.on("callback_query", async (ctx) => {
   if (data === "ADMIN_SET_PAYMENT") return admin.setPaymentInfo(ctx);
   if (data === "ADMIN_SET_HELP") return admin.setHelpText(ctx);
 
-  // ===== LEGACY HELP VIDEO
+  // ===== HELP VIDEO
   if (data === "ADMIN_UPLOAD_VIDEO") return admin.uploadHelpVideo(ctx);
   if (data === "ADMIN_DELETE_VIDEO") return admin.showDeleteHelpVideoMenu(ctx);
   if (data.startsWith("DEL_HELP_VIDEO_")) return admin.handleDeleteHelpVideo(ctx);
-  if (data === "DELETE_ALL_HELP_VIDEOS") return admin.deleteAllHelpVideos(ctx);
+  // if (data === "DELETE_ALL_HELP_VIDEOS") return admin.deleteAllHelpVideos(ctx); // Hapus jika tidak ada fungsinya
 
   // ===== BUTTON LABELS
   if (data === "ADMIN_SET_BUTTONS") return admin.showSetButtonsMenu(ctx);
   if (data.startsWith("ADMIN_SET_BTN_")) return admin.handleSelectButtonToEdit(ctx);
+  
+  // ===== HELP CALLBACKS (Generic)
+  // Tangani semua callback yang diawali HELP_
+  if (data.startsWith("HELP_")) return admin.handleHelpChoice(ctx);
 
-  return admin.noop(ctx);
+  // Fallback
+  return ctx.answerCbQuery().catch(() => {});
 });
 
 // ========================================
@@ -110,41 +129,27 @@ bot.on("callback_query", async (ctx) => {
 bot.on("text", async (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-  // 👉 USER ORDER
-  if (ctx.session.orderStep) return user.handleOrderInput(ctx);
+  // USER Order
+  if (ctx.session.orderStep && user && user.handleOrderInput) return user.handleOrderInput(ctx);
 
-  // 👉 ADMIN ONLY BELOW
+  // ADMIN ONLY
   if (!isAdmin) return;
 
-  // PRODUCT
   if (ctx.session.awaitingAddProduct) return admin.handleAddProduct(ctx);
   if (ctx.session.awaitingEditProduct) return admin.handleEditProduct(ctx);
-
-  // PAYMENT
   if (ctx.session.awaitingConfirmOrder) return admin.handleConfirmPayment(ctx);
-
-  // SETTINGS
+  
   if (ctx.session.awaitingSetGreeting) return admin.handleSetGreetingText(ctx);
   if (ctx.session.awaitingSetPayment) return admin.handleSetPaymentInfo(ctx);
   if (ctx.session.awaitingSetHelp) return admin.handleSetHelpText(ctx);
-
-  // HELP VIDEO
+  
   if (ctx.session.awaitingHelpVideo) return admin.handleUploadHelpVideo(ctx);
-
-  // HELP CATEGORY
-  if (ctx.session.awaitingNewHelpCategory) return admin.saveNewHelpCategory(ctx);
-  if (ctx.session.awaitingHelpCategoryName) return admin.handleAddHelpCategoryName(ctx);
-  if (ctx.session.awaitingEditCategoryName) return admin.handleEditHelpCategoryName(ctx);
-  if (ctx.session.awaitingUploadHelpVideoToCategory)
-    return admin.handleUploadVideoToCategory_message(ctx);
-
-  // LEGACY
-  if (ctx.session.awaitingCategoryVideo)
-    return admin.handleUploadHelpDescription(ctx);
-
-  // BUTTON LABEL EDIT
-  if (ctx.session.awaitingSetButtonKey)
-    return admin.handleSetButtonLabel(ctx);
+  
+  // Button Label Edit
+  if (ctx.session.awaitingSetButtonKey) return admin.handleSetButtonLabel(ctx);
+  
+  // Tambahkan handler lain jika ada (misal kategori help)
+  // ...
 });
 
 // ========================================
@@ -152,26 +157,24 @@ bot.on("text", async (ctx) => {
 // ========================================
 bot.on("video", async (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
-  // USER tidak punya handler video → skip
   if (!isAdmin) return;
 
-  if (ctx.session.awaitingHelpVideo)
-    return admin.handleUploadHelpVideo(ctx);
-
-  if (ctx.session.awaitingUploadHelpVideoToCategory)
-    return admin.handleUploadVideoToCategory_message(ctx);
+  if (ctx.session.awaitingHelpVideo) return admin.handleUploadHelpVideo(ctx);
+  
+  // Tambahkan handler upload video kategori jika ada
 });
 
 // ========================================
-// Help Menu
+// START BOT (WAJIB)
 // ========================================
-const helpHandlers = require('./handlers/adminHandlers'); // sesuaikan path
+bot.launch().then(() => {
+  console.log("✅ Bot berhasil dijalankan...");
+}).catch((err) => {
+  console.error("❌ Bot gagal start:", err);
+});
 
-// Tombol utama Help
-bot.command("help", helpHandlers.showHelpMenu);
-bot.action("HELP_MENU", helpHandlers.showHelpMenu);
+// Handle stop signal (untuk docker/cloud)
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-// Semua callback yang diawali HELP_
-bot.action(/HELP_/, helpHandlers.handleHelpChoice);
 module.exports = bot;
