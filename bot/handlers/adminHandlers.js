@@ -385,100 +385,139 @@ async function setStatus(ctx) {
   await ctx.reply('🔄 Kirim: `ORD-xxx|status`', { parse_mode: 'Markdown' });
 }
 
-/* ===========================
-   VIDEO HELP
-=========================== */
-async function uploadHelpVideo(ctx) {
-  if (!ctx.session) ctx.session = {};
-  ctx.session.awaitingHelpVideo = true;
-  await ctx.reply('🎥 Kirim video, ketik /done jika selesai.');
-}
+const settingsService = require("../../services/settingsService");
+const { Markup } = require("telegraf");
 
-async function handleUploadHelpVideo(ctx) {
-  if (!ctx.session || !ctx.session.awaitingHelpVideo) return;
-  if (ctx.message.text === '/done') {
-    ctx.session.awaitingHelpVideo = false;
-    return ctx.reply('✅ Selesai upload video.');
-  }
-  if (!ctx.message.video) return ctx.reply('❌ Kirim VIDEO.');
-  
-  // Logika simpan video...
-  await ctx.reply('🎞 Video diterima.');
-}
-
-async function showDeleteHelpVideoMenu(ctx) {
-  await ctx.reply('📝 Fitur hapus video (placeholder).');
-}
-
-async function handleDeleteHelpVideo(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
-}
-
-/* ===========================
-   HELP MENU (NEW)
-=========================== */
+/* =========================
+   HELP MENU USER
+========================= */
 async function showHelpMenu(ctx) {
-  const keyboard = [
-    [Markup.button.callback("▶ Video Bantuan", "HELP_VIDEO")],
-    [Markup.button.callback("💬 Chat Admin", "HELP_CHAT_ADMIN")]
-  ];
-  await ctx.reply("❓ Pilih bantuan:", { reply_markup: { inline_keyboard: keyboard } });
+  let data = await settingsService.getSetting("help_videos");
+  try { data = data ? JSON.parse(data) : {}; } catch { data = {}; }
+
+  const keyboard = Object.keys(data).map(cat => [
+    Markup.button.callback(`▶ ${cat}`, `HELP_VIDEO_${cat}`)
+  ]);
+
+  keyboard.push([Markup.button.callback("💬 Chat Admin", "HELP_CHAT_ADMIN")]);
+
+  return ctx.editMessageText("❓ Pilih bantuan:", {
+    reply_markup: { inline_keyboard: keyboard }
+  }).catch(() =>
+    ctx.reply("❓ Pilih bantuan:", { reply_markup:{ inline_keyboard: keyboard }})
+  );
 }
 
-async function handleHelpChoice(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
-  const data = ctx.callbackQuery.data;
+/* =========================
+   SHOW VIDEO BY CATEGORY
+========================= */
+async function showHelpVideoByCategory(ctx, category) {
+  let data = await settingsService.getSetting("help_videos");
+  try { data = JSON.parse(data || "{}"); } catch { data = {}; }
 
-  if (data === "HELP_VIDEO") {
-     await showHelpVideo(ctx); // panggil function kamu
-  }
+  const videos = data[category] || [];
+  if (!videos.length) return ctx.reply("❌ Video tidak ada.");
 
-  else if (data === "HELP_CHAT_ADMIN") {
-     const adminText =
-       (await settingsService.getSetting("admin_chat_text")) ||
-       "💬 Silakan hubungi admin.";
+  const video = videos[Math.floor(Math.random() * videos.length)];
 
-     await ctx.reply(adminText);
-  }
+  await ctx.replyWithVideo(video.file_id, {
+    caption: video.caption || `🎥 ${category}`
+  });
 }
 
-async uploadHelpVideo(ctx) {
-  try {
-    if (!ctx.message.video) {
-      return ctx.reply("❌ Kirim video yang ingin dijadikan tutorial.");
-    }
+/* =========================
+   ADMIN UPLOAD FLOW
+========================= */
+async function uploadHelpVideo(ctx){
+  if(!ctx.session) ctx.session = {};
+  ctx.session.awaitingVideoCategory = true;
+  ctx.reply("📂 Kirim nama kategori video:");
+}
 
-    const fileId = ctx.message.video.file_id;
+async function handleVideoCategory(ctx){
+  if(!ctx.session?.awaitingVideoCategory) return;
+  ctx.session.videoCategory = ctx.message.text.toLowerCase();
+  ctx.session.awaitingVideoCategory = false;
+  ctx.session.awaitingVideoUpload = true;
+  ctx.reply("🎥 Sekarang kirim videonya.");
+}
 
-    // Ambil data lama
-    let videos = await settingsService.getSetting('help_videos');
-    try {
-      videos = videos ? JSON.parse(videos) : [];
-    } catch {
-      videos = [];
-    }
+async function handleUploadHelpVideo(ctx){
+  if(!ctx.session?.awaitingVideoUpload) return;
+  if(!ctx.message.video) return ctx.reply("❌ Kirim video.");
 
-    videos.push({
-      file_id: fileId,
-      caption: ctx.message.caption || ""
+  const category = ctx.session.videoCategory;
+  const fileId = ctx.message.video.file_id;
+
+  let data = await settingsService.getSetting("help_videos");
+  try { data = data ? JSON.parse(data) : {}; } catch { data = {}; }
+
+  if(!data[category]) data[category] = [];
+
+  data[category].push({
+    file_id: fileId,
+    caption: ctx.message.caption || ""
+  });
+
+  await settingsService.setSetting("help_videos", JSON.stringify(data));
+
+  ctx.session.awaitingVideoUpload = false;
+  ctx.reply(`✅ Video masuk kategori *${category}*`,{parse_mode:"Markdown"});
+}
+
+/* =========================
+   DELETE VIDEO
+========================= */
+async function showDeleteHelpVideoMenu(ctx){
+  let data = await settingsService.getSetting("help_videos");
+  data = JSON.parse(data || "{}");
+
+  for(const cat of Object.keys(data)){
+    await ctx.reply(`📂 ${cat}`);
+    data[cat].forEach((v,i)=>{
+      ctx.replyWithVideo(v.file_id,{
+        caption:`${cat} #${i}`,
+        reply_markup:{
+          inline_keyboard:[
+            [Markup.button.callback("🗑 Hapus",`DEL_VIDEO_${cat}_${i}`)]
+          ]
+        }
+      });
     });
-
-    await settingsService.setSetting('help_videos', JSON.stringify(videos));
-
-    ctx.reply("✅ Video tutorial berhasil ditambahkan!");
-
-  } catch (err) {
-    console.error("UPLOAD HELP VIDEO ERROR:", err);
-    ctx.reply("❌ Gagal menyimpan video.");
   }
 }
 
-async setAdminText(ctx) {
-  const text = ctx.message.text.replace("/setadmintext ", "");
-  await settingsService.setSetting("admin_chat_text", text);
-  ctx.reply("✅ Teks chat admin diperbarui.");
+async function handleDeleteHelpVideo(ctx){
+  const key = ctx.callbackQuery.data.replace("DEL_VIDEO_","");
+  const [cat,index] = key.split("_");
+
+  let data = JSON.parse(await settingsService.getSetting("help_videos") || "{}");
+
+  data[cat].splice(index,1);
+  await settingsService.setSetting("help_videos", JSON.stringify(data));
+
+  ctx.answerCbQuery("Dihapus");
+  ctx.reply("🗑 Video dihapus");
 }
 
+/* =========================
+   HELP CHOICE
+========================= */
+async function handleHelpChoice(ctx){
+  const data = ctx.callbackQuery.data;
+  await ctx.answerCbQuery().catch(()=>{});
+
+  if(data.startsWith("HELP_VIDEO_")){
+    const cat = data.replace("HELP_VIDEO_","");
+    return showHelpVideoByCategory(ctx,cat);
+  }
+
+  if(data === "HELP_CHAT_ADMIN"){
+    if(!ctx.session) ctx.session = {};
+    ctx.session.chatAdmin = true;
+    return ctx.reply("💬 Kirim pesan untuk admin. Ketik /batal untuk keluar.");
+  }
+}
 /* ===========================
    EXPORT
 =========================== */
@@ -508,10 +547,11 @@ module.exports = {
   handleSetPaymentInfo,
   setHelpText,
   handleSetHelpText,
+  showHelpMenu,
+  handleHelpChoice,
   uploadHelpVideo,
+  handleVideoCategory,
   handleUploadHelpVideo,
   showDeleteHelpVideoMenu,
-  handleDeleteHelpVideo,
-  showHelpMenu,       // Ditambahkan
-  handleHelpChoice    // Ditambahkan
+  handleDeleteHelpVideo
 };
