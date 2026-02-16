@@ -132,7 +132,7 @@ bot.on("text", async (ctx) => {
   // USER Order
   if (ctx.session.orderStep && user && user.handleOrderInput) return user.handleOrderInput(ctx);
 
-  // ADMIN ONLY
+  // ADMIN ONLY'
   if (!isAdmin) return;
 
   if (ctx.session.awaitingAddProduct) return admin.handleAddProduct(ctx);
@@ -167,8 +167,7 @@ bot.on("video", async (ctx) => {
 // ========================================
 // START BOT (WAJIB)
 // ========================================
-bot.launch().then(() => {
-  console.log("✅ Bot berhasil dijalankan...");
+module.exports = bot;
 }).catch((err) => {
   console.error("❌ Bot gagal start:", err);
 });
@@ -178,3 +177,11 @@ process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 module.exports = bot;
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
