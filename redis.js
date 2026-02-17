@@ -1,52 +1,61 @@
 const { createClient } = require('redis');
 
-async function main() {
-  const redisUrl =
-    process.env.REDIS_URL ||
-    
+const redisUrl = process.env.REDIS_URL;
 
-  // Encode password jika perlu
-  let safeUrl = redisUrl;
-  if (redisUrl.includes('@')) {
-    const parts = redisUrl.split('@');
-    const auth = parts[0].replace('rediss://', '');
-    const [user, pass] = auth.split(':');
-    const encodedPass = encodeURIComponent(pass);
-    safeUrl = `rediss://${user}:${encodedPass}@${parts[1]}`;
-  }
-
-  const client = createClient({
-    url: safeUrl,
-    socket: {
-      tls: true,
-      rejectUnauthorized: false,
-    },
-  });
-
-  client.on('error', (err) => console.error('Redis error:', err));
-
-  await client.connect();
-
-  // 🔍 Cek tipe key
-  const type = await client.type('products');
-  console.log(`🔎 Type of key 'products':`, type);
-
-  // Jika tipe adalah 'set', tampilkan isinya
-  if (type === 'set') {
-    const members = await client.sMembers('products');
-    console.log('🧾 Members of products:', members);
-  } else if (type === 'string') {
-    const val = await client.get('products');
-    console.log('🧾 Value of products (string):', val);
-  } else if (type === 'hash') {
-    const fields = await client.hGetAll('products');
-    console.log('🧾 Fields of products (hash):', fields);
-  } else {
-    console.log(`ℹ️ No members to show for type: ${type}`);
-  }
-
-  await client.disconnect();
-  console.log('✅ Done.');
+if (!redisUrl) {
+  console.error("❌ REDIS_URL belum diset di .env");
+  process.exit(1);
 }
 
-main().catch((err) => console.error('❌ Error:', err));
+const client = createClient({
+  url: redisUrl,
+  socket: redisUrl.startsWith('rediss://')
+    ? {
+        tls: true,
+        rejectUnauthorized: false,
+      }
+    : undefined,
+});
+
+client.on('error', (err) =>
+  console.error('❌ Redis Client Error:', err)
+);
+
+client.on('connect', () =>
+  console.log('✅ Redis connected')
+);
+
+client.on('ready', () =>
+  console.log('🚀 Redis ready')
+);
+
+client.on('end', () =>
+  console.log('⚠️ Redis disconnected')
+);
+
+(async () => {
+  try {
+    await client.connect();
+
+    const type = await client.type('products');
+    console.log(`🔎 Type of key 'products':`, type);
+
+    if (type === 'set') {
+      const members = await client.sMembers('products');
+      console.log('🧾 Members of products:', members);
+    } else if (type === 'string') {
+      const val = await client.get('products');
+      console.log('🧾 Value:', val);
+    } else if (type === 'hash') {
+      const fields = await client.hGetAll('products');
+      console.log('🧾 Fields:', fields);
+    } else {
+      console.log(`ℹ️ No data found`);
+    }
+
+    await client.disconnect();
+    console.log('✅ Done.');
+  } catch (err) {
+    console.error('❌ Error:', err);
+  }
+})();
