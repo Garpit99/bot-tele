@@ -55,7 +55,6 @@ const BUTTONS = {
   BTN_ADMIN_SET_STATUS: "🔄 Ubah Status Order",
   BTN_ADMIN_SET_GREETING: "💬 Ubah Greeting",
   BTN_ADMIN_SET_PAYMENT: "💳 Ubah Rekening Pembayaran",
-  BTN_ADMIN_SET_HELP: "❓ Ubah Text Bantuan",
   BTN_ADMIN_UPLOAD_VIDEO: "🎥 Upload Video Bantuan",
   BTN_ADMIN_DELETE_VIDEO: "🗑 Hapus Video Bantuan",
   BTN_ADMIN_SET_BUTTONS: "🔧 Ubah Nama Tombol",
