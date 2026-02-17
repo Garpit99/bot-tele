@@ -8,7 +8,7 @@ if (!process.env.BOT_TOKEN) {
 const { Telegraf } = require("telegraf");
 const admin = require("./handlers/adminHandlers");
 const user = require("./handlers/userHandler");
-const settingsService = require("./services/settingsService");
+const settingsService = require("../services/settingsService");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
