@@ -56,12 +56,11 @@ const BUTTONS = {
   BTN_ADMIN_SET_GREETING: "💬 Ubah Greeting",
   BTN_ADMIN_SET_PAYMENT: "💳 Ubah Rekening Pembayaran",
   BTN_ADMIN_SET_HELP: "❓ Ubah Text Bantuan",
-  BTN_ADMIN_UPLOAD_VIDEO: "🎥 Upload Video Bantuan",
-  BTN_ADMIN_DELETE_VIDEO: "🗑 Hapus Video Bantuan",
   BTN_ADMIN_SET_BUTTONS: "🔧 Ubah Nama Tombol",
   BTN_ADMIN_SET_CHAT_TEXT: "💬 Ubah Text Chat Admin",
   BTN_ADMIN_SET_VIDEO_TEXT: "🎥 Ubah Text Video Checkout",
   BTN_ADMIN_UPLOAD_CHECKOUT_VIDEO: "🎬 Upload Video Checkout"
+  BTN_ADMIN_DELETE_CHECKOUT_VIDEO: "🗑 Hapus Video Checkout",
 
 };
 
@@ -86,14 +85,21 @@ async function getBtn(key) {
 async function showAdminMenu(ctx) {
   try {
     const keys = [
-      "BTN_ADMIN_ADD_PRODUCT", "BTN_ADMIN_EDIT_PRODUCT", "BTN_ADMIN_DELETE_PRODUCT",
-      "BTN_ADMIN_LIST_ORDERS", "BTN_ADMIN_CONFIRM_PAYMENT", "BTN_ADMIN_SET_RESI",
-      "BTN_ADMIN_SET_STATUS", "BTN_ADMIN_SET_GREETING", "BTN_ADMIN_SET_PAYMENT",
-      "BTN_ADMIN_SET_HELP", "BTN_ADMIN_UPLOAD_VIDEO", "BTN_ADMIN_DELETE_VIDEO",
+      "BTN_ADMIN_ADD_PRODUCT", 
+      "BTN_ADMIN_EDIT_PRODUCT", 
+      "BTN_ADMIN_DELETE_PRODUCT",
+      "BTN_ADMIN_LIST_ORDERS", 
+      "BTN_ADMIN_CONFIRM_PAYMENT", 
+      "BTN_ADMIN_SET_RESI",
+      "BTN_ADMIN_SET_STATUS", 
+      "BTN_ADMIN_SET_GREETING", 
+      "BTN_ADMIN_SET_PAYMENT",
+      "BTN_ADMIN_SET_HELP", 
       "BTN_ADMIN_SET_BUTTONS",
       "BTN_ADMIN_SET_CHAT_TEXT",
       "BTN_ADMIN_SET_VIDEO_TEXT",
       "BTN_ADMIN_UPLOAD_CHECKOUT_VIDEO"
+      "BTN_ADMIN_DELETE_CHECKOUT_VIDEO",
 
 
     ];
@@ -496,6 +502,38 @@ async function handleUploadCheckoutVideo(ctx) {
 }
 
 /* ===========================
+   DELETE VIDEO CHECKOUT
+=========================== */
+async function deleteCheckoutVideo(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
+
+  try {
+    const raw = await settingsService.getSetting("help_checkout_video");
+    if (!raw) {
+      return ctx.reply("⚠️ Tidak ada video checkout yang tersimpan.");
+    }
+
+    const data = JSON.parse(raw);
+
+    if (!data.file_id) {
+      return ctx.reply("⚠️ Tidak ada video checkout yang tersimpan.");
+    }
+
+    delete data.file_id;
+
+    await settingsService.setSetting(
+      "help_checkout_video",
+      JSON.stringify(data)
+    );
+
+    await ctx.reply("🗑 Video checkout berhasil dihapus.");
+  } catch (err) {
+    console.error(err);
+    await ctx.reply("❌ Gagal menghapus video checkout.");
+  }
+}
+
+/* ===========================
    EXPORT
 =========================== */
 module.exports = {
@@ -532,4 +570,5 @@ module.exports = {
   handleSetCheckoutVideoCaption,
   uploadCheckoutVideo,
   handleUploadCheckoutVideo
+  deleteCheckoutVideo,
 };
