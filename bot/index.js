@@ -1,8 +1,8 @@
 require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
-const admin = require("./handlers/adminHandlers");
-const user = require("./handlers/userHandler");
+const admin = require("../handlers/adminHandlers");
+const user = require("../handlers/userHandler");
 const settingsService = require("../services/settingsService");
 
 if (!process.env.BOT_TOKEN) {
