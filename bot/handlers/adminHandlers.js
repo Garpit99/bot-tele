@@ -379,36 +379,33 @@ ctx.reply("✅ video tersimpan")
 // ================== DELETE VIDEO ==================
 
 async function deleteCheckoutVideo(ctx) {
-  const kb = [
-    [
-      Markup.button.callback("✅ Ya, hapus", "CONFIRM_DELETE_VIDEO"),
-      Markup.button.callback("❌ Batal", "CANCEL_DELETE_VIDEO"),
-    ],
-  ];
-
-  await ctx.reply(
-    "⚠️ Yakin ingin menghapus video tutorial checkout?",
-    { reply_markup: { inline_keyboard: kb } }
-  );
-}
-
-async function handleConfirmDeleteVideo(ctx) {
   try {
-    await settingsService.setSetting("help_checkout_video", "");
-    await ctx.editMessageText("🗑 Video berhasil dihapus.");
+    const videoData = await settingsService.getSetting("help_checkout_video");
+
+    if (!videoData)
+      return ctx.reply("❌ Tidak ada video.");
+
+    let fileId = videoData;
+
+    if (videoData.startsWith("{")) {
+      const obj = JSON.parse(videoData);
+      fileId = obj.file_id;
+    }
+
+    await ctx.replyWithVideo(fileId, {
+      caption: "⚠️ Yakin ingin hapus video ini?",
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Ya", callback_data: "CONFIRM_DELETE_VIDEO" },
+          { text: "❌ Batal", callback_data: "CANCEL_DELETE_VIDEO" }
+        ]]
+      }
+    });
+
   } catch (err) {
     console.error(err);
-    await ctx.reply("❌ Gagal menghapus video.");
+    ctx.reply("❌ Gagal preview video.");
   }
-}
-
-async function handleCancelDeleteVideo(ctx) {
-  await ctx.editMessageText("❌ Penghapusan dibatalkan.");
-}
-
-// ================== SAFE FALLBACK ==================
-async function notImplemented(ctx){
-  return ctx.reply("❌ Fitur belum tersedia");
 }
 
 // ===== TAMBAHAN AGAR INDEX TIDAK ERROR =====
@@ -441,7 +438,7 @@ module.exports = {
 EXPORT
 ================================================= */
 
-module.exports={
+module.exports = {
 
 BUTTONS,
 
@@ -472,6 +469,6 @@ handleUploadCheckoutVideo,
 
 deleteCheckoutVideo,
 handleConfirmDeleteVideo,
-handleCancelDeleteVideo,
+handleCancelDeleteVideo
 
-}
+};
