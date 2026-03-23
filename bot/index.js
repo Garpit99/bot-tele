@@ -218,6 +218,14 @@ bot.on("message", async (ctx, next) => {
 });
 
 // ========================================
+// FIX boot
+// ========================================
+
+bot.catch((err, ctx) => {
+  console.error("BOT ERROR:", err)
+})
+
+// ========================================
 // START BOT
 // ========================================
 process.once("SIGINT", () => bot.stop("SIGINT"));
