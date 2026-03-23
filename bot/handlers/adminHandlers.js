@@ -367,6 +367,29 @@ async function handleSetGreetingText(ctx){
 
 }
 
+async function setChatAdminText(ctx) {
+
+  if (!ctx.session) ctx.session = {}
+
+  ctx.session.awaitingChatAdminText = true
+
+  await ctx.reply("💬 Kirim text yang akan tampil saat user klik Chat Admin")
+
+}
+
+async function handleSetChatAdminText(ctx) {
+
+  if (!ctx.session || !ctx.session.awaitingChatAdminText) return
+
+  const text = ctx.message.text.trim()
+
+  await settingsService.setSetting("help_chat_text", text)
+
+  ctx.session.awaitingChatAdminText = false
+
+  await ctx.reply("✅ Text chat admin berhasil diupdate")
+
+}
 
 /* =================================================
    VIDEO CHECKOUT
@@ -420,7 +443,7 @@ async function deleteCheckoutVideo(ctx){
    EXPORT
 ================================================= */
 
-module.exports={
+module.exports = {
 
   BUTTONS,
 
@@ -443,5 +466,8 @@ module.exports={
   uploadCheckoutVideo,
   handleUploadCheckoutVideo,
   deleteCheckoutVideo,
+
+  setChatAdminText,
+  handleSetChatAdminText
 
 }
