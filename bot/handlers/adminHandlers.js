@@ -4,6 +4,11 @@ const settingsService = require('../../services/settingsService')
 const buttonService = require('../../services/buttonService')
 const { Markup } = require('telegraf')
 
+function ensureSession(ctx){
+  if(!ctx.session) ctx.session={}
+}
+
+
 /* =================================================
 UTILS
 ================================================= */
@@ -378,34 +383,37 @@ ctx.reply("✅ video tersimpan")
 
 // ================== DELETE VIDEO ==================
 
-async function deleteCheckoutVideo(ctx) {
-  try {
+// ================= DELETE VIDEO =================
+async function deleteCheckoutVideo(ctx){
+  try{
     const videoData = await settingsService.getSetting("help_checkout_video");
 
     if (!videoData)
       return ctx.reply("❌ Tidak ada video.");
 
-    let fileId = videoData;
-
-    if (videoData.startsWith("{")) {
-      const obj = JSON.parse(videoData);
-      fileId = obj.file_id;
-    }
-
-    await ctx.replyWithVideo(fileId, {
-      caption: "⚠️ Yakin ingin hapus video ini?",
-      reply_markup: {
-        inline_keyboard: [[
-          { text: "✅ Ya", callback_data: "CONFIRM_DELETE_VIDEO" },
-          { text: "❌ Batal", callback_data: "CANCEL_DELETE_VIDEO" }
+    await ctx.replyWithVideo(videoData,{
+      caption:"⚠️ Yakin hapus video?",
+      reply_markup:{
+        inline_keyboard:[[
+          {text:"✅ Ya",callback_data:"CONFIRM_DELETE_VIDEO"},
+          {text:"❌ Batal",callback_data:"CANCEL_DELETE_VIDEO"}
         ]]
       }
     });
 
-  } catch (err) {
-    console.error(err);
-    ctx.reply("❌ Gagal preview video.");
+  }catch(e){
+    console.log(e)
+    ctx.reply("❌ error preview")
   }
+}
+
+async function handleConfirmDeleteVideo(ctx){
+  await settingsService.setSetting("help_checkout_video","")
+  await ctx.editMessageCaption("🗑 Video dihapus")
+}
+
+async function handleCancelDeleteVideo(ctx){
+  await ctx.editMessageCaption("❌ Dibatalkan")
 }
 
 // ===== TAMBAHAN AGAR INDEX TIDAK ERROR =====
