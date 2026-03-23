@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const { connect } = require('./db/database');
-const bot = require('./index'); // ✅ FIX PATH
+const bot = require('./bot/index'); // ✅ FIX PATH
 
 const app = express();
 const PORT = process.env.PORT || 3000;
