@@ -212,6 +212,18 @@ bot.on("video", async (ctx) => {
     return admin.handleUploadCheckoutVideo(ctx);
 });
 
+// ===== DELETE VIDEO =====
+if (data === "ADMIN_DELETE_CHECKOUT_VIDEO")
+  return admin.deleteCheckoutVideo(ctx);
+
+if (data === "CONFIRM_DELETE_VIDEO")
+  return admin.handleConfirmDeleteVideo(ctx);
+
+if (data === "CANCEL_DELETE_VIDEO")
+  return admin.handleCancelDeleteVideo(ctx);
+
+});
+
 // ========================================
 // ADMIN REPLY TO USER
 // ========================================
