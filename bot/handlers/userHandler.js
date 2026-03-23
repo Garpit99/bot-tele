@@ -80,38 +80,30 @@ async helpMenu(ctx) {
 /* ============================
     🎥 SHOW CHECKOUT VIDEO
 ============================ */
-async function showCheckoutVideo(ctx) {
-
+async showCheckoutVideo(ctx) {
   try {
-
-    const videoData = await settingsService.getSetting("help_checkout_video")
+    const videoData = await settingsService.getSetting("help_checkout_video");
 
     if (!videoData)
-      return ctx.reply("❌ Video tutorial belum tersedia.")
+      return ctx.reply("❌ Video tutorial belum tersedia.");
 
-    let fileId = videoData
+    let fileId = videoData;
 
-    // Jika format lama (JSON)
     if (videoData.startsWith("{")) {
-      const obj = JSON.parse(videoData)
-      fileId = obj.file_id
+      const obj = JSON.parse(videoData);
+      fileId = obj.file_id;
     }
 
     const caption =
       (await settingsService.getSetting("help_video_caption")) ||
-      "🎥 Tutorial Checkout"
+      "🎥 Tutorial Checkout";
 
-    await ctx.replyWithVideo(fileId, {
-      caption
-    })
+    await ctx.replyWithVideo(fileId, { caption });
 
   } catch (err) {
-
-    console.error("showCheckoutVideo error", err)
-    ctx.reply("❌ Gagal menampilkan video.")
-
+    console.error("showCheckoutVideo error", err);
+    ctx.reply("❌ Gagal menampilkan video.");
   }
-
 },
 
   /* ============================
