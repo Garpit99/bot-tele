@@ -376,6 +376,36 @@ ctx.reply("✅ video tersimpan")
 
 }
 
+// ================== DELETE VIDEO ==================
+
+async function deleteCheckoutVideo(ctx) {
+  const kb = [
+    [
+      Markup.button.callback("✅ Ya, hapus", "CONFIRM_DELETE_VIDEO"),
+      Markup.button.callback("❌ Batal", "CANCEL_DELETE_VIDEO"),
+    ],
+  ];
+
+  await ctx.reply(
+    "⚠️ Yakin ingin menghapus video tutorial checkout?",
+    { reply_markup: { inline_keyboard: kb } }
+  );
+}
+
+async function handleConfirmDeleteVideo(ctx) {
+  try {
+    await settingsService.setSetting("help_checkout_video", "");
+    await ctx.editMessageText("🗑 Video berhasil dihapus.");
+  } catch (err) {
+    console.error(err);
+    await ctx.reply("❌ Gagal menghapus video.");
+  }
+}
+
+async function handleCancelDeleteVideo(ctx) {
+  await ctx.editMessageText("❌ Penghapusan dibatalkan.");
+}
+
 // ================== SAFE FALLBACK ==================
 async function notImplemented(ctx){
   return ctx.reply("❌ Fitur belum tersedia");
@@ -438,6 +468,10 @@ setChatAdminText,
 handleSetChatAdminText,
 
 uploadCheckoutVideo,
-handleUploadCheckoutVideo
+handleUploadCheckoutVideo,
+
+deleteCheckoutVideo,
+handleConfirmDeleteVideo,
+handleCancelDeleteVideo,
 
 }
