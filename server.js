@@ -1,52 +1,47 @@
-require("dotenv").config();
-const express = require("express");
-const { Telegraf } = require("telegraf");
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const { connect } = require('./db/database');
+const bot = require('./bot');
 
 const app = express();
-const bot = new Telegraf(process.env.BOT_TOKEN);
-
 const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
-// ===== BASIC MIDDLEWARE =====
-app.use(express.json());
+app.use(bodyParser.json());
+app.get('/', (req, res) => res.status(200).send('✅ Bot is running and healthy'));
 
-// ===== HEALTH CHECK =====
-app.get("/", (req, res) => {
-  res.status(200).send("✅ Bot Alive");
-});
+async function init() {
+  await connect();
+  console.log('🚀 Database connected');
 
-// ===== TELEGRAM WEBHOOK =====
-app.use("/telegram", bot.webhookCallback("/telegram"));
+  const webhookPath = '/telegram/webhook';
+  const webhookFull = `${process.env.WEBHOOK_URL}${webhookPath}`;
 
-// ===== BOT COMMAND =====
-bot.start((ctx) => {
-  ctx.reply("🤖 Bot aktif di Leapcell!");
-});
+  if (process.env.WEBHOOK_URL) {
+    // 🔧 Hapus polling jika webhook aktif
+    await bot.telegram.deleteWebhook().catch(() => {});
+    await bot.telegram.setWebhook(webhookFull);
 
-bot.help((ctx) => {
-  ctx.reply("Gunakan /start untuk mulai.");
-});
+    app.use(bot.webhookCallback(webhookPath));
 
-// ===== ERROR HANDLER =====
-bot.catch((err) => {
-  console.error("BOT ERROR:", err);
-});
-
-// ===== START SERVER =====
-app.listen(PORT, async () => {
-  console.log("🚀 Server running on port", PORT);
-
-  if (!process.env.WEBHOOK_URL) {
-    console.log("❌ WEBHOOK_URL belum diset di environment");
-    return;
+    console.log(`✅ Webhook registered: ${webhookFull}`);
+  } else {
+    // 🔄 Mode development: polling
+    await bot.telegram.deleteWebhook().catch(() => {});
+    await bot.launch();
+    console.log('🤖 Bot polling launched (development mode)');
   }
 
-  const webhookUrl = process.env.WEBHOOK_URL + "/telegram";
+  app.listen(PORT, HOST, () => {
+    console.log(`🌐 Server running on http://${HOST}:${PORT}`);
+  });
+}
 
-  try {
-    await bot.telegram.setWebhook(webhookUrl);
-    console.log("✅ Webhook berhasil diset ke:", webhookUrl);
-  } catch (err) {
-    console.error("❌ Gagal set webhook:", err.message);
-  }
+init().catch((err) => {
+  console.error('❌ Initialization failed:', err);
+  process.exit(1);
 });
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
