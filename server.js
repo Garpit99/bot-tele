@@ -1,97 +1,52 @@
 require("dotenv").config();
 const express = require("express");
-const { Telegraf, Markup } = require("telegraf");
+const { Telegraf } = require("telegraf");
 
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const PORT = process.env.PORT || 3000;
 
-const ADMIN_IDS = (process.env.ADMIN_IDS || "")
-  .split(",")
-  .map(x => x.trim());
+// ===== BASIC MIDDLEWARE =====
+app.use(express.json());
 
-// ===== SESSION SIMPLE =====
-const session = {};
-bot.use((ctx, next) => {
-  const id = ctx.chat?.id;
-  if (!session[id]) session[id] = {};
-  ctx.session = session[id];
-  return next();
+// ===== HEALTH CHECK =====
+app.get("/", (req, res) => {
+  res.status(200).send("✅ Bot Alive");
 });
 
-// ===== START =====
+// ===== TELEGRAM WEBHOOK =====
+app.use("/telegram", bot.webhookCallback("/telegram"));
+
+// ===== BOT COMMAND =====
 bot.start((ctx) => {
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
-  return ctx.reply("Halo 👋", {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "📦 Lihat Produk", callback_data: "VIEW_PRODUCTS" }],
-        isAdmin
-          ? [{ text: "⚙️ Admin Panel", callback_data: "ADMIN_PANEL" }]
-          : []
-      ]
-    }
-  });
+  ctx.reply("🤖 Bot aktif di Leapcell!");
 });
 
-// ===== CALLBACK =====
-bot.on("callback_query", async (ctx) => {
-  const data = ctx.callbackQuery.data;
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
-  await ctx.answerCbQuery().catch(() => {});
-
-  console.log("CALLBACK:", data);
-
-  // ===== USER =====
-  if (data === "VIEW_PRODUCTS") {
-    return ctx.reply("📦 Produk tersedia:\n\n1. Produk A\n2. Produk B");
-  }
-
-  // ===== ADMIN CHECK =====
-  if (data.startsWith("ADMIN") && !isAdmin) {
-    return ctx.reply("❌ Kamu bukan admin");
-  }
-
-  // ===== ADMIN =====
-  if (data === "ADMIN_PANEL") {
-    return ctx.reply("📋 Panel Admin", {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "➕ Tambah Produk", callback_data: "ADD_PRODUCT" }]
-        ]
-      }
-    });
-  }
-
-  if (data === "ADD_PRODUCT") {
-    ctx.session.awaitingProduct = true;
-    return ctx.reply("Ketik nama produk:");
-  }
-});
-
-// ===== TEXT =====
-bot.on("text", async (ctx) => {
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
-  if (ctx.session.awaitingProduct && isAdmin) {
-    ctx.session.awaitingProduct = false;
-    return ctx.reply("✅ Produk berhasil ditambahkan:\n" + ctx.message.text);
-  }
+bot.help((ctx) => {
+  ctx.reply("Gunakan /start untuk mulai.");
 });
 
 // ===== ERROR HANDLER =====
-bot.catch((err) => console.error("BOT ERROR:", err));
-
-// ===== EXPRESS =====
-app.get("/", (req, res) => res.send("✅ Bot Alive"));
-
-bot.launch().then(() => {
-  console.log("🤖 Bot running...");
+bot.catch((err) => {
+  console.error("BOT ERROR:", err);
 });
 
-app.listen(PORT, () => {
+// ===== START SERVER =====
+app.listen(PORT, async () => {
   console.log("🚀 Server running on port", PORT);
+
+  if (!process.env.WEBHOOK_URL) {
+    console.log("❌ WEBHOOK_URL belum diset di environment");
+    return;
+  }
+
+  const webhookUrl = process.env.WEBHOOK_URL + "/telegram";
+
+  try {
+    await bot.telegram.setWebhook(webhookUrl);
+    console.log("✅ Webhook berhasil diset ke:", webhookUrl);
+  } catch (err) {
+    console.error("❌ Gagal set webhook:", err.message);
+  }
 });
