@@ -2,18 +2,11 @@ require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
 
-// ✅ FIX PATH (WAJIB)
-const admin = require("./handlers/adminHandlers");
-const user = require("./handlers/userHandler");
-const settingsService = require("../services/settingsService");
-
-if (!process.env.BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN belum diset di .env");
-  process.exit(1);
-}
+// ✅ PATH HARUS BENAR
+const admin = require("../handlers/adminHandlers");
+const user = require("../handlers/userHandler");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-
 // ===== ADMIN =====
 const ADMIN_IDS = (process.env.ADMIN_IDS || "")
   .split(",")
@@ -29,16 +22,21 @@ bot.use((ctx, next) => {
 });
 
 // ===== START =====
+bot.start(ctx => {
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+  return user.start(ctx, isAdmin);
+});
+
+// ===== CALLBACK (INI OTAK BOT) =====
 bot.on("callback_query", async (ctx) => {
   try {
     const data = ctx.callbackQuery.data;
     const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-    // WAJIB: biar tombol gak loading
+    // ❗ WAJIB (biar tombol gak loading)
     await ctx.answerCbQuery().catch(() => {});
 
     console.log("CALLBACK:", data);
-    console.log("USER ID:", ctx.from.id);
 
     // ===== USER =====
     if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
@@ -53,9 +51,9 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("Kirim pesan ke admin. /batal untuk keluar");
     }
 
-    // ===== BLOCK NON ADMIN =====
-    if (!isAdmin) {
-      return ctx.answerCbQuery("❌ Bukan admin", { show_alert: true });
+     // ===== CEK ADMIN =====
+    if (data.startsWith("ADMIN") && !isAdmin) {
+      return ctx.reply("❌ Bukan admin");
     }
 
     // ===== ADMIN =====
@@ -86,16 +84,16 @@ bot.on("callback_query", async (ctx) => {
     if (data === "CANCEL_DELETE_VIDEO")
       return admin.handleCancelDeleteVideo(ctx);
 
-  } catch (err) {
+ } catch (err) {
     console.error("❌ CALLBACK ERROR:", err);
-    return ctx.answerCbQuery("❌ Error", { show_alert: true });
   }
 });
 
 // ===== TEXT =====
 bot.on("text", async (ctx) => {
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
+  if (ctx.session.awaitingAddProduct)
+    return admin.handleAddProduct(ctx);
+  
   if (ctx.message.text === "/batal") {
     ctx.session.chatAdmin = false;
     return ctx.reply("❌ Dibatalkan");
