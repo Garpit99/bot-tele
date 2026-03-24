@@ -3,8 +3,8 @@ require("dotenv").config();
 const { Telegraf } = require("telegraf");
 
 // ✅ PATH HARUS BENAR
-const admin = require("../handlers/adminHandlers");
-const user = require("../handlers/userHandler");
+const admin = require("../adminHandlers");
+const user = require("../userHandler");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 // ===== ADMIN =====
