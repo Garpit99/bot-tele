@@ -427,20 +427,6 @@ async function showSetButtonsMenu(ctx){ return notImplemented(ctx) }
 async function handleSelectButtonToEdit(ctx){ return notImplemented(ctx) }
 async function handleSelectDeleteProduct(ctx){ return notImplemented(ctx) }
 
-// ================== EXPORT TAMBAHAN ==================
-module.exports = {
-  ...module.exports,
-
-  setHelpIntro,
-  setCheckoutVideoCaption,
-  handleCancelDeleteProduct,
-  setResi,
-  setStatus,
-  setPaymentInfo,
-  showSetButtonsMenu,
-  handleSelectButtonToEdit,
-  handleSelectDeleteProduct
-};
 
 /* =================================================
 EXPORT
@@ -477,6 +463,15 @@ handleUploadCheckoutVideo,
 
 deleteCheckoutVideo,
 handleConfirmDeleteVideo,
-handleCancelDeleteVideo
+handleCancelDeleteVideo,
 
+setHelpIntro,
+setCheckoutVideoCaption,
+handleCancelDeleteProduct,
+setResi,
+setStatus,
+setPaymentInfo,
+showSetButtonsMenu,
+handleSelectButtonToEdit,
+handleSelectDeleteProduct
 };
