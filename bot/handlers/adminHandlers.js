@@ -64,6 +64,22 @@ async function showAdminMenu(ctx){
     reply_markup: { inline_keyboard: keyboard }
   })
 }
+async function start(ctx, isAdmin) {
+  return ctx.reply("Halo user 👋", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "📦 Lihat Produk", callback_data: "VIEW_PRODUCTS" }],
+        isAdmin
+          ? [{ text: "⚙️ Admin Panel", callback_data: "ADMIN_PANEL" }]
+          : []
+      ]
+    }
+  });
+}
+
+async function viewProducts(ctx) {
+  return ctx.reply("📦 Ini produk (dummy)");
+}
 
 /* =================================================
 ADD PRODUCT
@@ -364,5 +380,7 @@ module.exports = {
 
   deleteCheckoutVideo,
   handleConfirmDeleteVideo,
-  handleCancelDeleteVideo
+  handleCancelDeleteVideo,
+  start,
+  viewProducts
 }
