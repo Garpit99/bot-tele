@@ -87,17 +87,29 @@ ADMIN MENU
 
 async function showAdminMenu(ctx){
 
-const buttons=Object.keys(BUTTONS).map(k=>
-Markup.button.callback(BUTTONS[k],k.replace("BTN_",""))
-)
+  const keyboard = [
+    [
+      Markup.button.callback("➕ Tambah Produk", "ADMIN_ADD_PRODUCT"),
+      Markup.button.callback("✏️ Edit Produk", "ADMIN_EDIT_PRODUCT"),
+      Markup.button.callback("🗑 Hapus Produk", "ADMIN_DELETE_PRODUCT"),
+    ],
+    [
+      Markup.button.callback("📦 List Order", "ADMIN_LIST_ORDERS"),
+      Markup.button.callback("💳 Konfirmasi Pembayaran", "ADMIN_CONFIRM_PAYMENT"),
+    ],
+    [
+      Markup.button.callback("💬 Ubah Greeting", "ADMIN_SET_GREETING"),
+      Markup.button.callback("💬 Text Chat Admin", "ADMIN_SET_CHAT_TEXT"),
+    ],
+    [
+      Markup.button.callback("🎬 Upload Video", "ADMIN_UPLOAD_CHECKOUT_VIDEO"),
+      Markup.button.callback("🗑 Hapus Video", "ADMIN_DELETE_CHECKOUT_VIDEO"),
+    ]
+  ];
 
-const keyboard=chunk(buttons,3)
-
-await ctx.reply(
-"📋 Panel Admin",
-{reply_markup:{inline_keyboard:keyboard}}
-)
-
+  await ctx.reply("📋 Panel Admin", {
+    reply_markup: { inline_keyboard: keyboard }
+  });
 }
 
 /* =================================================
@@ -105,7 +117,8 @@ ADD PRODUCT
 ================================================= */
 
 async function addProduct(ctx){
-
+  console.log("🔥 ADMIN_ADD_PRODUCT TRIGGERED");
+  
 ensureSession(ctx)
 ctx.session.awaitingAddProduct=true
 
@@ -166,7 +179,8 @@ EDIT PRODUCT
 ================================================= */
 
 async function showEditProductMenu(ctx){
-
+  console.log("🔥 ADMIN_EDIT_PRODUCT TRIGGERED");
+  
 const products=await productService.listProducts()
 
 if(!products.length)
