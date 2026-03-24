@@ -29,24 +29,16 @@ bot.use((ctx, next) => {
 });
 
 // ===== START =====
-bot.start((ctx) => {
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-  return user.start(ctx, isAdmin);
-});
-
-// ===== ADMIN MENU =====
 bot.on("callback_query", async (ctx) => {
   try {
     const data = ctx.callbackQuery.data;
+    const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
-    // ✅ WAJIB BANGET (ini penyebab utama tombol tidak respon)
-    await ctx.answerCbQuery();
+    // WAJIB: biar tombol gak loading
+    await ctx.answerCbQuery().catch(() => {});
 
-    // ✅ DEBUG (lihat di terminal)
     console.log("CALLBACK:", data);
     console.log("USER ID:", ctx.from.id);
-
-    const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
     // ===== USER =====
     if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
@@ -61,15 +53,18 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("Kirim pesan ke admin. /batal untuk keluar");
     }
 
-    // ===== ADMIN CHECK =====
+    // ===== BLOCK NON ADMIN =====
     if (!isAdmin) {
       return ctx.answerCbQuery("❌ Bukan admin", { show_alert: true });
     }
 
     // ===== ADMIN =====
+    if (data === "ADMIN_PANEL") return admin.showAdminMenu(ctx);
+
     if (data === "ADMIN_ADD_PRODUCT") return admin.addProduct(ctx);
     if (data === "ADMIN_EDIT_PRODUCT") return admin.showEditProductMenu(ctx);
     if (data.startsWith("EDIT_PROD_")) return admin.handleSelectProductToEdit(ctx);
+
     if (data === "ADMIN_DELETE_PRODUCT") return admin.showDeleteProductMenu(ctx);
     if (data.startsWith("CONFIRM_DEL_")) return admin.handleConfirmDeleteProduct(ctx);
 
