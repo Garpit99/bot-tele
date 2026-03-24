@@ -1,8 +1,10 @@
 require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
-const admin = require("../handlers/adminHandlers");
-const user = require("../handlers/userHandler");
+
+// ✅ FIX PATH (WAJIB)
+const admin = require("./handlers/adminHandlers");
+const user = require("./handlers/userHandler");
 const settingsService = require("../services/settingsService");
 
 if (!process.env.BOT_TOKEN) {
@@ -60,7 +62,6 @@ bot.on("callback_query", async (ctx) => {
     return ctx.reply("Kirim pesan ke admin. /batal untuk keluar");
   }
 
-  // ===== STOP NON ADMIN =====
   if (!isAdmin)
     return ctx.answerCbQuery("❌ Bukan admin", { show_alert: true });
 
@@ -77,7 +78,6 @@ bot.on("callback_query", async (ctx) => {
   if (data === "ADMIN_SET_GREETING") return admin.setGreeting(ctx);
   if (data === "ADMIN_SET_CHAT_TEXT") return admin.setChatAdminText(ctx);
 
-  // ===== VIDEO =====
   if (data === "ADMIN_UPLOAD_CHECKOUT_VIDEO")
     return admin.uploadCheckoutVideo(ctx);
 
@@ -138,7 +138,7 @@ bot.on("video", (ctx) => {
     return admin.handleUploadCheckoutVideo(ctx);
 });
 
-// ===== ERROR HANDLER =====
+// ===== ERROR =====
 bot.catch((err) => console.error("BOT ERROR:", err));
 
 module.exports = bot;
