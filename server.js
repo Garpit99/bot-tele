@@ -5,45 +5,30 @@ const { Telegraf } = require("telegraf");
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// WAJIB untuk parsing JSON
+// ===== PENTING =====
 app.use(express.json());
 
-// Health check
+// ===== HEALTH CHECK =====
 app.get("/", (req, res) => {
-  res.status(200).send("✅ Bot Alive");
+  res.send("✅ Bot Alive");
 });
 
-// Telegram webhook
+// ===== WEBHOOK ENDPOINT =====
 app.post("/telegram", (req, res) => {
   bot.handleUpdate(req.body);
   res.sendStatus(200);
 });
 
-// Bot command
+// ===== BOT START COMMAND =====
 bot.start((ctx) => {
   console.log("START MASUK");
-  ctx.reply("🤖 Bot aktif di Leapcell!");
+  ctx.reply("🤖 Bot kamu sudah aktif dan tidak error lagi!");
 });
 
-// Error handler
-bot.catch((err) => console.error("BOT ERROR:", err));
+// ===== ERROR HANDLER =====
+bot.catch((err) => {
+  console.error("BOT ERROR:", err);
+});
 
-// SET WEBHOOK SEKALI SAJA
-(async () => {
-  if (!process.env.WEBHOOK_URL) {
-    console.log("❌ WEBHOOK_URL belum diset");
-    return;
-  }
-
-  const webhookUrl = process.env.WEBHOOK_URL + "/telegram";
-
-  try {
-    await bot.telegram.setWebhook(webhookUrl);
-    console.log("✅ Webhook berhasil diset ke:", webhookUrl);
-  } catch (err) {
-    console.error("❌ Gagal set webhook:", err.message);
-  }
-})();
-
-// ❗ PENTING UNTUK LEAPCELL
+// ===== EXPORT UNTUK LEAPCELL =====
 module.exports = app;
