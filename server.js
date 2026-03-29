@@ -1,34 +1,71 @@
-require("dotenv").config();
-const express = require("express");
-const { Telegraf } = require("telegraf");
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const { connect } = require('./db/database');
+const bot = require('./bot/index'); // ✅ FIX PATH
 
 const app = express();
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
-// ===== PENTING =====
-app.use(express.json());
+app.use(bodyParser.json());
 
 // ===== HEALTH CHECK =====
-app.get("/", (req, res) => {
-  res.send("✅ Bot Alive");
+app.get('/', (req, res) => {
+  res.status(200).send('✅ Bot is running');
 });
 
-// ===== WEBHOOK ENDPOINT =====
-app.post("/telegram", (req, res) => {
-  bot.handleUpdate(req.body);
-  res.sendStatus(200);
+// ===== INIT =====
+async function init() {
+  try {
+    // ===== DB CONNECT =====
+    await connect();
+    console.log('✅ Database connected');
+
+    const webhookPath = '/telegram/webhook';
+    const webhookFull = process.env.WEBHOOK_URL
+      ? `${process.env.WEBHOOK_URL}${webhookPath}`
+      : null;
+
+    if (webhookFull) {
+      // ===== WEBHOOK MODE =====
+      await bot.telegram.deleteWebhook().catch(() => {});
+      await bot.telegram.setWebhook(webhookFull);
+
+      app.use(bot.webhookCallback(webhookPath));
+
+      console.log('🌐 Webhook mode aktif');
+      console.log(`➡️ ${webhookFull}`);
+    } else {
+      // ===== POLLING MODE =====
+      await bot.telegram.deleteWebhook().catch(() => {});
+      await bot.launch();
+
+      console.log('🤖 Bot running (polling mode)');
+    }
+
+    // ===== START SERVER =====
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+    });
+
+  } catch (err) {
+    console.error('❌ INIT ERROR:', err);
+    process.exit(1);
+  }
+}
+
+init();
+
+// ===== GLOBAL ERROR HANDLER =====
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
 });
 
-// ===== BOT START COMMAND =====
-bot.start((ctx) => {
-  console.log("START MASUK");
-  ctx.reply("🤖 Bot kamu sudah aktif dan tidak error lagi!");
+process.on('unhandledRejection', (err) => {
+  console.error('🔥 Unhandled Rejection:', err);
 });
 
-// ===== ERROR HANDLER =====
-bot.catch((err) => {
-  console.error("BOT ERROR:", err);
-});
-
-// ===== EXPORT UNTUK LEAPCELL =====
-module.exports = app;
+// ===== SHUTDOWN =====
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
