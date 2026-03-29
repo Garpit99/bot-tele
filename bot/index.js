@@ -65,6 +65,7 @@ bot.on("callback_query", async (ctx) => {
     return ctx.answerCbQuery("❌ Bukan admin", { show_alert: true });
 
   // ===== ADMIN =====
+  if (data === "ADMIN_PANEL") return admin.showAdminMenu(ctx);
   if (data === "ADMIN_ADD_PRODUCT") return admin.addProduct(ctx);
   if (data === "ADMIN_EDIT_PRODUCT") return admin.showEditProductMenu(ctx);
   if (data.startsWith("EDIT_PROD_")) return admin.handleSelectProductToEdit(ctx);
