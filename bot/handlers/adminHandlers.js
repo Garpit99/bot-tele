@@ -4,11 +4,6 @@ const settingsService = require('../../services/settingsService')
 const buttonService = require('../../services/buttonService')
 const { Markup } = require('telegraf')
 
-function ensureSession(ctx){
-  if(!ctx.session) ctx.session={}
-}
-
-
 /* =================================================
 UTILS
 ================================================= */
@@ -417,6 +412,10 @@ async function handleCancelDeleteVideo(ctx){
 }
 
 // ===== TAMBAHAN AGAR INDEX TIDAK ERROR =====
+function notImplemented(ctx){
+  return ctx.reply("⚠️ Fitur belum tersedia")
+}
+
 async function setHelpIntro(ctx){ return notImplemented(ctx) }
 async function setCheckoutVideoCaption(ctx){ return notImplemented(ctx) }
 async function handleCancelDeleteProduct(ctx){ return notImplemented(ctx) }
@@ -427,7 +426,6 @@ async function showSetButtonsMenu(ctx){ return notImplemented(ctx) }
 async function handleSelectButtonToEdit(ctx){ return notImplemented(ctx) }
 async function handleSelectDeleteProduct(ctx){ return notImplemented(ctx) }
 
-}
 
 /* =================================================
 EXPORT
