@@ -60,9 +60,6 @@ BTN_ADMIN_SET_STATUS:"🔄 Ubah Status",
 
 BTN_ADMIN_SET_GREETING:"💬 Ubah Greeting",
 BTN_ADMIN_SET_PAYMENT:"💳 Ubah Pembayaran",
-BTN_ADMIN_SET_HELP:"❓ Ubah Help Text",
-
-BTN_ADMIN_SET_BUTTONS:"🔧 Ubah Tombol",
 
 BTN_ADMIN_SET_CHAT_TEXT:"💬 Text Chat Admin",
 BTN_ADMIN_SET_VIDEO_TEXT:"🎥 Caption Video",
@@ -376,7 +373,6 @@ ctx.reply("✅ video tersimpan")
 
 }
 
-// ================== DELETE VIDEO ==================
 
 // ================= DELETE VIDEO =================
 async function deleteCheckoutVideo(ctx){
@@ -455,8 +451,7 @@ handleConfirmPayment,
 setGreeting,
 handleSetGreetingText,
   setHelpIntro,
-setChatAdminText,
-handleSetChatAdminText,
+
 
 setCheckoutVideoCaption,
 uploadCheckoutVideo,
