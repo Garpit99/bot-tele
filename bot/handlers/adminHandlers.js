@@ -451,6 +451,7 @@ handleConfirmPayment,
 setGreeting,
 handleSetGreetingText,
   setHelpIntro,
+  setChatAdminText,
 
 
 setCheckoutVideoCaption,
