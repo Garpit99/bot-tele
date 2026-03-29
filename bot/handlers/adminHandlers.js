@@ -83,7 +83,7 @@ ADMIN MENU
 async function showAdminMenu(ctx){
 
 const buttons=Object.keys(BUTTONS).map(k=>
-Markup.button.callback(BUTTONS[k],k.replace("BTN_",""))
+Markup.button.callback(BUTTONS[k],k)
 )
 
 const keyboard=chunk(buttons,3)
