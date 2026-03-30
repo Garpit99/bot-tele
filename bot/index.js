@@ -63,7 +63,7 @@ bot.on("callback_query", async (ctx) => {
 }
   if (data === "HELP_VIDEO_CHECKOUT") {
   console.log("MASUK VIDEO");
-  return user.showCheckoutVideo(ctx);
+  return user.showRandomHelpVideo(ctx);
 }
 
   if (data === "HELP_CHAT_ADMIN") {
