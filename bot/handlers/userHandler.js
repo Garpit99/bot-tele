@@ -159,7 +159,8 @@ async showRandomHelpVideo(ctx) {
   /* ============================
        📖 PRODUCT DETAIL
   ============================ */
-  async viewProductDetail(ctx) {
+ async viewProductDetail(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
     if (!ctx.session) ctx.session = {};
     const client = getClient();
     const id = ctx.callbackQuery.data.replace('VIEW_DETAIL_', '');
@@ -179,10 +180,18 @@ async showRandomHelpVideo(ctx) {
       [{ text: await getBtn('BTN_BACK'), callback_data: 'VIEW_PRODUCTS' }],
     ];
 
-    await ctx.editMessageText(message, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons },
-    });
+    try {
+  await ctx.editMessageText(message, {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: buttons },
+  });
+} catch (err) {
+  if (err.description?.includes("message is not modified")) {
+    // ✅ aman, abaikan saja
+    return;
+  }
+  throw err; // error lain tetap dilempar
+}
   },
 
   /* ============================
