@@ -112,6 +112,30 @@ async showCheckoutVideo(ctx) {
     await ctx.reply("❌ Gagal menampilkan video.");
   }
 },
+
+   /* ============================
+      Random VIDEO
+  ============================ */
+async showRandomHelpVideo(ctx) {
+  try {
+    let videos = await settingsService.getSetting('help_videos');
+    videos = videos ? JSON.parse(videos) : [];
+
+    if (!videos.length) {
+      return ctx.reply("📭 Belum ada video bantuan.");
+    }
+
+    const random = videos[Math.floor(Math.random() * videos.length)];
+
+    await ctx.replyWithVideo(random.file_id, {
+      caption: random.caption || "🎥 Video bantuan"
+    });
+
+  } catch (err) {
+    console.error(err);
+    ctx.reply("❌ Gagal menampilkan video.");
+  }
+},
   /* ============================
       🛒 VIEW PRODUCTS
   ============================ */
