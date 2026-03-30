@@ -84,14 +84,21 @@ async showCheckoutVideo(ctx) {
   try {
     const videoData = await settingsService.getSetting("help_checkout_video");
 
-    if (!videoData)
+    // Jika video kosong atau tidak ada, jangan tampilkan
+    if (!videoData || videoData === "") {
       return ctx.reply("❌ Video tutorial belum tersedia.");
+    }
 
     let fileId = videoData;
 
-    if (videoData.startsWith("{")) {
-      const obj = JSON.parse(videoData);
-      fileId = obj.file_id;
+    try {
+      if (videoData.startsWith("{")) {
+        const obj = JSON.parse(videoData);
+        fileId = obj.file_id;
+      }
+    } catch (parseErr) {
+      console.error("Parse video data error:", parseErr);
+      fileId = videoData; // Gunakan langsung jika parse error
     }
 
     const caption =
@@ -101,11 +108,10 @@ async showCheckoutVideo(ctx) {
     await ctx.replyWithVideo(fileId, { caption });
 
   } catch (err) {
-    console.error("showCheckoutVideo error", err);
-    ctx.reply("❌ Gagal menampilkan video.");
+    console.error("❌ showCheckoutVideo error:", err.message);
+    await ctx.reply("❌ Gagal menampilkan video.");
   }
 },
-
   /* ============================
       🛒 VIEW PRODUCTS
   ============================ */
