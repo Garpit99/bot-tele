@@ -294,6 +294,34 @@ ctx.reply("✅ pembayaran dikonfirmasi")
 
 }
 
+// ===== HANDLE SET HELP INTRO =====
+async function handleSetHelpIntro(ctx){
+  if(!ctx.session.awaitingHelpIntro) return
+  
+  try {
+    const introText = ctx.message.text
+    
+    if(!introText || introText.trim().length === 0){
+      await ctx.reply("❌ Pesan intro tidak boleh kosong")
+      return
+    }
+    
+    // Simpan ke database atau file
+    // (sesuaikan dengan settingsService Anda)
+    await settingsService.updateSetting('helpIntro', introText)
+    
+    // Bersihkan flag
+    ctx.session.awaitingHelpIntro = false
+    
+    await ctx.reply("✅ Intro bantuan berhasil diubah")
+    await ctx.reply(`📋 Preview:\n${introText}`)
+    
+  } catch(err) {
+    console.error("Error setting help intro:", err)
+    await ctx.reply("❌ Gagal mengubah intro bantuan")
+  }
+}
+
 /* =================================================
 SETTINGS
 ================================================= */
@@ -413,7 +441,13 @@ function notImplemented(ctx){
   return ctx.reply("⚠️ Fitur belum tersedia")
 }
 
-async function setHelpIntro(ctx){ return notImplemented(ctx) }
+async function setHelpIntro(ctx){
+  ensureSession(ctx)
+  resetSession(ctx)
+  
+  ctx.session.awaitingHelpIntro = true
+  await ctx.reply("📝 Kirim pesan intro bantuan:\n(Pesan ini akan ditampilkan saat user ketik /help)")
+}
 async function setCheckoutVideoCaption(ctx){ return notImplemented(ctx) }
 async function handleCancelDeleteProduct(ctx){ return notImplemented(ctx) }
 async function setResi(ctx){ return notImplemented(ctx) }
@@ -462,6 +496,7 @@ handleConfirmPayment,
 setGreeting,
 handleSetGreetingText,
   setHelpIntro,
+  handleSetHelpIntro,
   setChatAdminText,
   handleSetChatAdminText,
 
