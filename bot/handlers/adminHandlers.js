@@ -460,6 +460,15 @@ async function setHelpIntro(ctx){
   await ctx.reply("📝 Kirim pesan intro bantuan:\n(Pesan ini akan ditampilkan saat user ketik /help)")
 }
 
+async function setCheckoutVideoCaption(ctx){ return notImplemented(ctx) }
+async function handleCancelDeleteProduct(ctx){ return notImplemented(ctx) }
+async function setResi(ctx){ return notImplemented(ctx) }
+async function setStatus(ctx){ return notImplemented(ctx) }
+async function setPaymentInfo(ctx){ return notImplemented(ctx) }
+async function showSetButtonsMenu(ctx){ return notImplemented(ctx) }
+async function handleSelectButtonToEdit(ctx){ return notImplemented(ctx) }
+async function handleSelectDeleteProduct(ctx){ return notImplemented(ctx) }
+
 
 /* =================================================
 EXPORT
