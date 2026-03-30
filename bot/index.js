@@ -45,7 +45,9 @@ bot.command("help", (ctx) => user.helpMenu(ctx));
 // ===== CALLBACK =====
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
-  console.log("CALLBACK:", data); // ✅ TAMBAHKAN
+  if (process.env.DEBUG === "true") {
+  console.log("CALLBACK:", data);
+}
   await ctx.answerCbQuery(); // ✅ WAJIB
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
   
