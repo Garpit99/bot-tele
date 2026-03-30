@@ -2,57 +2,76 @@
 const { getClient } = require('../db/database');
 
 const SETTINGS_KEY = 'bot_settings';
-
+let isChecked = false;
+let cache = {};
 /**
  * 🧩 Pastikan key 'bot_settings' bertipe hash agar tidak error WRONGTYPE
  */
+
 async function ensureSettingsHash(client) {
+  if (isChecked) return;
+
   try {
     const type = await client.type(SETTINGS_KEY);
+
     if (type !== 'hash' && type !== 'none') {
-      console.warn(`⚠️ Key '${SETTINGS_KEY}' bertipe ${type}, bukan hash — melakukan reset...`);
+      console.warn(`⚠️ Key '${SETTINGS_KEY}' salah tipe (${type}), reset...`);
       await client.del(SETTINGS_KEY);
-      console.log(`✅ Key '${SETTINGS_KEY}' direset sebagai hash`);
     }
+
+    isChecked = true;
+    console.log("✅ Settings hash ready");
   } catch (err) {
-    console.error('❌ ensureSettingsHash() error:', err);
+    console.error('❌ ensureSettingsHash() error:', err.message);
   }
 }
-
 /**
  * 🔍 Ambil setting dari Redis
  */
 async function getSetting(key) {
-  const client = getClient();
-  if (!client) {
-    console.error('❌ Redis client belum terhubung!');
+  try {
+    if (cache[key] !== undefined) return cache[key];
+
+    const client = getClient();
+    if (!client) return null;
+
+    await ensureSettingsHash(client);
+
+    const val = await client.hGet(SETTINGS_KEY, key);
+    cache[key] = val;
+
+    return val;
+
+  } catch (err) {
+    console.error("❌ getSetting error:", err.message);
     return null;
   }
-
-  await ensureSettingsHash(client);
-  const val = await client.hGet(SETTINGS_KEY, key);
-  return val || null;
 }
-
 /**
- * 💾 Simpan atau update setting ke Redis
+ * 💾 Simpan/update setting + update cache
  */
 async function setSetting(key, value) {
-  const client = getClient();
-  if (!client) {
-    console.error('❌ Redis client belum terhubung!');
-    return;
-  }
+  try {
+    const client = getClient();
+    if (!client) return;
 
-  await ensureSettingsHash(client);
-  // Fix Redis v4+ syntax: hSet accepts object or fieldValue pairs
-  await client.hSet(SETTINGS_KEY, {
-    [key]: String(value)
-  });
-  console.log(`✅ Setting '${key}' disimpan: ${value}`);
+    await ensureSettingsHash(client);
+
+    const stringValue = String(value);
+
+    await client.hSet(SETTINGS_KEY, {
+      [key]: stringValue
+    });
+
+    cache[key] = stringValue; // ✅ sync cache
+
+    console.log(`✅ Setting '${key}' disimpan`);
+
+  } catch (err) {
+    console.error("❌ setSetting error:", err.message);
+  }
 }
 
-// ✅ Ekspor fungsi
 module.exports = {
   getSetting,
   setSetting,
