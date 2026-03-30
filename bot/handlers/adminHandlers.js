@@ -459,25 +459,7 @@ async function setHelpIntro(ctx){
   ctx.session.awaitingHelpIntro = true
   await ctx.reply("📝 Kirim pesan intro bantuan:\n(Pesan ini akan ditampilkan saat user ketik /help)")
 }
-async function setCheckoutVideoCaption(ctx){ return notImplemented(ctx) }
-async function handleCancelDeleteProduct(ctx){ return notImplemented(ctx) }
-async function setResi(ctx){ return notImplemented(ctx) }
-async function setStatus(ctx){ return notImplemented(ctx) }
-async function setPaymentInfo(ctx){ return notImplemented(ctx) }
-async function showSetButtonsMenu(ctx){ return notImplemented(ctx) }
-async function handleSelectButtonToEdit(ctx){ return notImplemented(ctx) }
-async function handleSelectDeleteProduct(ctx){ return notImplemented(ctx) }
 
-/*===== Reset Session=====*/
-
-function resetSession(ctx){
-  ctx.session.awaitingAddProduct = false
-  ctx.session.awaitingEditProduct = false
-  ctx.session.awaitingConfirmOrder = false
-  ctx.session.awaitingSetGreeting = false
-  ctx.session.awaitingChatText = false
-  ctx.session.awaitingCheckoutVideo = false
-}
 
 /* =================================================
 EXPORT
