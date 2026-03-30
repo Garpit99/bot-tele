@@ -46,8 +46,9 @@ bot.command("help", (ctx) => user.helpMenu(ctx));
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
   console.log("CALLBACK:", data); // ✅ TAMBAHKAN
-  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
   await ctx.answerCbQuery(); // ✅ WAJIB
+  const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
+  
 
 
   // ===== USER =====
@@ -56,7 +57,10 @@ bot.on("callback_query", async (ctx) => {
   if (data.startsWith("OPEN_LINK_")) return user.openRandomLink(ctx);
   if (data.startsWith("BUY_PRODUCT_")) return user.buyProduct(ctx);
 
-  if (data === "HELP_VIDEO_CHECKOUT") return user.showCheckoutVideo(ctx);
+  if (data === "HELP_VIDEO_CHECKOUT") {
+  console.log("MASUK VIDEO");
+  return user.showCheckoutVideo(ctx);
+}
 
   if (data === "HELP_CHAT_ADMIN") {
   ctx.session.chatAdmin = true;
