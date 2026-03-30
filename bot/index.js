@@ -46,11 +46,9 @@ bot.command("help", (ctx) => user.helpMenu(ctx));
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
-
-bot.on("callback_query", async (ctx) => {
   await ctx.answerCbQuery(); // ✅ WAJIB
 
-  const data = ctx.callbackQuery.data;
+
   // ===== USER =====
   if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
   if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
@@ -60,8 +58,14 @@ bot.on("callback_query", async (ctx) => {
   if (data === "HELP_VIDEO_CHECKOUT") return user.showCheckoutVideo(ctx);
 
   if (data === "HELP_CHAT_ADMIN") {
-    ctx.session.chatAdmin = true;
-    return ctx.reply("Kirim pesan ke admin. /batal untuk keluar");
+  ctx.session.chatAdmin = true;
+
+  // ✅ reset biar tidak bentrok
+  ctx.session.awaitingAddProduct = false;
+  ctx.session.awaitingEditProduct = false;
+  ctx.session.awaitingChatText = false;
+
+  return ctx.reply("💬 Kirim pesan ke admin.\nKetik /batal untuk keluar");
   }
 
   // ===== STOP NON ADMIN =====
