@@ -185,7 +185,7 @@ async function showEditProductMenu(ctx) {
 
 async function handleSelectProductToEdit(ctx) {
   await ctx.answerCbQuery().catch(() => {});
-  const raw = ctx.callbackQuery.data || '';
+  const raw = ctx.answerCbQuery.data || '';
   const id = sanitizeId(raw);
 
   if (!ctx.session) ctx.session = {};
@@ -223,7 +223,7 @@ async function showDeleteProductMenu(ctx) {
 
 async function handleSelectDeleteProduct(ctx) {
   await ctx.answerCbQuery().catch(() => {});
-  const raw = ctx.callbackQuery.data || '';
+  const raw = ctx.answerCbQuery.data || '';
   const id = sanitizeId(raw);
   
   if (!ctx.session) ctx.session = {};
@@ -238,7 +238,7 @@ async function handleSelectDeleteProduct(ctx) {
 
 async function handleConfirmDeleteProduct(ctx) {
   await ctx.answerCbQuery().catch(() => {});
-  const raw = ctx.callbackQuery.data || '';
+  const raw = ctx.answerCbQuery.data || '';
   const id = sanitizeId(raw);
 
   try {
@@ -302,7 +302,7 @@ async function showHelpMenu(ctx) {
 
 async function handleHelpChoice(ctx) {
   await ctx.answerCbQuery().catch(() => {});
-  const data = ctx.callbackQuery.data;
+  const data = ctx.answerCbQuery.data;
   
 async function showHelpVideo(ctx) {
   try {
@@ -404,7 +404,7 @@ async function showDeleteVideoMenu(ctx) {
 
 async function handleSelectDeleteVideo(ctx) {
   await ctx.answerCbQuery().catch(() => {});
-  const index = parseInt(ctx.callbackQuery.data.split("_")[2]);
+  const index = parseInt(ctx.answerCbQuery.data.split("_")[2]);
 
   const keyboard = [[
     Markup.button.callback("✅ Ya", `CONFIRM_DEL_VIDEO_${index}`),
@@ -420,7 +420,7 @@ async function handleConfirmDeleteVideo(ctx) {
   await ctx.answerCbQuery().catch(() => {});
 
   try {
-    const index = parseInt(ctx.callbackQuery.data.split("_")[3]);
+    const index = parseInt(ctx.answerCbQuery.data.split("_")[3]);
 
     let videos = await settingsService.getSetting('help_videos');
     videos = videos ? JSON.parse(videos) : [];
