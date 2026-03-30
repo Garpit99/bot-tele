@@ -92,6 +92,7 @@ bot.on("callback_query", async (ctx) => {
 
   if (data === "ADMIN_SET_GREETING") return admin.setGreeting(ctx);
   if (data === "ADMIN_SET_CHAT_TEXT") return admin.setChatAdminText(ctx);
+  if (data === "ADMIN_SET_HELP_INTRO") return admin.setHelpIntro(ctx);
 
   // ===== VIDEO =====
   if (data === "ADMIN_UPLOAD_CHECKOUT_VIDEO")
@@ -143,6 +144,10 @@ bot.on("text", async (ctx) => {
 
   if (ctx.session.awaitingChatText)
     return admin.handleSetChatAdminText(ctx);
+
+  if (ctx.session.awaitingHelpIntro)
+    return admin.handleSetHelpIntro(ctx);
+  
 });
 
 // ===== VIDEO ADMIN =====
