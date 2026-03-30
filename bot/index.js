@@ -56,8 +56,8 @@ bot.on("callback_query", async (ctx) => {
   if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
   if (data.startsWith("OPEN_LINK_")) return user.openRandomLink(ctx);
   if (data.startsWith("BUY_PRODUCT_")) return user.buyProduct(ctx);
-  if (data === "OPEN_HELP_MENU") {
-  return user.helpMenu(ctx); // ✅ panggil function kamu
+  if (data === "OPEN_HELP_MENU" || data === "HELP_MENU") {
+  return user.helpMenu(ctx);
 }
   if (data === "HELP_VIDEO_CHECKOUT") {
   console.log("MASUK VIDEO");
