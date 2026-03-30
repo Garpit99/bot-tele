@@ -68,12 +68,6 @@ bot.on("callback_query", async (ctx) => {
 
   if (data === "HELP_CHAT_ADMIN") {
   ctx.session.chatAdmin = true;
-
-  // ✅ reset biar tidak bentrok
-  ctx.session.awaitingAddProduct = false;
-  ctx.session.awaitingEditProduct = false;
-  ctx.session.awaitingChatText = false;
-
   return ctx.reply("💬 Kirim pesan ke admin.\nKetik /batal untuk keluar");
   }
 
@@ -96,20 +90,27 @@ bot.on("callback_query", async (ctx) => {
   if (data === "ADMIN_SET_CHAT_TEXT") return admin.setChatAdminText(ctx);
   if (data === "ADMIN_SET_HELP_INTRO") return admin.setHelpIntro(ctx);
 
-  // ===== VIDEO =====
-  if (data === "ADMIN_UPLOAD_CHECKOUT_VIDEO")
-    return admin.uploadCheckoutVideo(ctx);
+ // ===== VIDEO ADMIN =====
+if (data === "ADMIN_UPLOAD_VIDEO") {
+  ctx.session.awaitingUploadVideo = true;
+  return ctx.reply("🎥 Kirim video sekarang...");
+}
 
-  if (data === "ADMIN_DELETE_CHECKOUT_VIDEO")
-    return admin.deleteCheckoutVideo(ctx);
+if (data === "ADMIN_DELETE_VIDEO") {
+  return admin.showDeleteVideoMenu(ctx);
+}
 
-  if (data === "CONFIRM_DELETE_VIDEO")
-    return admin.handleConfirmDeleteVideo(ctx);
+if (data.startsWith("DEL_VIDEO_")) {
+  return admin.handleSelectDeleteVideo(ctx);
+}
 
-  if (data === "CANCEL_DELETE_VIDEO")
-    return admin.handleCancelDeleteVideo(ctx);
+if (data.startsWith("CONFIRM_DEL_VIDEO_")) {
+  return admin.handleConfirmDeleteVideo(ctx);
+}
 
-  return ctx.answerCbQuery();
+if (data === "CANCEL_DEL_VIDEO") {
+  return admin.handleCancelDeleteVideo(ctx);
+}
 });
 
 // ===== TEXT =====
@@ -157,8 +158,8 @@ bot.on("video", (ctx) => {
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
   if (!isAdmin) return;
 
-  if (ctx.session.awaitingCheckoutVideo)
-    return admin.handleUploadCheckoutVideo(ctx);
+  if (ctx.session.awaitingUploadVideo)
+  return admin.uploadHelpVideo(ctx);
 });
 
 // ===== ERROR HANDLER =====
