@@ -452,6 +452,7 @@ setGreeting,
 handleSetGreetingText,
   setHelpIntro,
   setChatAdminText,
+  handleSetChatAdminText,
 
 
 setCheckoutVideoCaption,
