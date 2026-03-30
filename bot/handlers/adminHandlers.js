@@ -182,7 +182,6 @@ await ctx.reply(msg,{reply_markup:{inline_keyboard:keyboard}})
 
 }
 
-}
 
 async function handleSelectProductToEdit(ctx){
 
@@ -308,7 +307,6 @@ async function setGreeting(ctx){
   ctx.reply("Kirim greeting baru")
 }
 
-}
 
 async function handleSetGreetingText(ctx){
 
