@@ -239,7 +239,6 @@ await ctx.reply(
 
 }
 
-}
 
 async function handleConfirmDeleteProduct(ctx){
 
