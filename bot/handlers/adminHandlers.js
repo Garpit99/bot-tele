@@ -97,9 +97,10 @@ ADD PRODUCT
 ================================================= */
 
 async function addProduct(ctx){
+  ensureSession(ctx)
+  resetSession(ctx) // ✅ TAMBAHKAN
 
-ensureSession(ctx)
-ctx.session.awaitingAddProduct=true
+  ctx.session.awaitingAddProduct = true
 
 await ctx.reply(
 `Kirim data produk:
@@ -299,11 +300,13 @@ SETTINGS
 ================================================= */
 
 async function setGreeting(ctx){
+  ensureSession(ctx)
+  resetSession(ctx) // ✅ TAMBAHKAN
 
-ensureSession(ctx)
-ctx.session.awaitingSetGreeting=true
+  ctx.session.awaitingSetGreeting = true
 
-ctx.reply("Kirim greeting baru")
+  ctx.reply("Kirim greeting baru")
+}
 
 }
 
@@ -320,12 +323,12 @@ ctx.reply("✅ greeting diupdate")
 }
 
 async function setChatAdminText(ctx){
+  ensureSession(ctx)
+  resetSession(ctx) // ✅ TAMBAHKAN INI
 
-ensureSession(ctx)
-ctx.session.awaitingChatText=true
+  ctx.session.awaitingChatText = true
 
-ctx.reply("Kirim text chat admin")
-
+  await ctx.reply("✍️ Kirim text chat admin")
 }
 
 async function handleSetChatAdminText(ctx){
@@ -422,6 +425,16 @@ async function showSetButtonsMenu(ctx){ return notImplemented(ctx) }
 async function handleSelectButtonToEdit(ctx){ return notImplemented(ctx) }
 async function handleSelectDeleteProduct(ctx){ return notImplemented(ctx) }
 
+/*===== Reset Session=====*/
+
+function resetSession(ctx){
+  ctx.session.awaitingAddProduct = false
+  ctx.session.awaitingEditProduct = false
+  ctx.session.awaitingConfirmOrder = false
+  ctx.session.awaitingSetGreeting = false
+  ctx.session.awaitingChatText = false
+  ctx.session.awaitingCheckoutVideo = false
+}
 
 /* =================================================
 EXPORT
