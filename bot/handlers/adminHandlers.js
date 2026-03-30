@@ -182,6 +182,7 @@ await ctx.reply(msg,{reply_markup:{inline_keyboard:keyboard}})
 
 }
 
+}
 
 async function handleSelectProductToEdit(ctx){
 
@@ -239,6 +240,7 @@ await ctx.reply(
 
 }
 
+}
 
 async function handleConfirmDeleteProduct(ctx){
 
