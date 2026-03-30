@@ -45,7 +45,10 @@ async function setSetting(key, value) {
   }
 
   await ensureSettingsHash(client);
-  await client.hSet(SETTINGS_KEY, key, String(value));
+  // Fix Redis v4+ syntax: hSet accepts object or fieldValue pairs
+  await client.hSet(SETTINGS_KEY, {
+    [key]: String(value)
+  });
   console.log(`✅ Setting '${key}' disimpan: ${value}`);
 }
 
