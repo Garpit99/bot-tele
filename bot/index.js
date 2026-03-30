@@ -47,6 +47,10 @@ bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
   const isAdmin = ADMIN_IDS.includes(String(ctx.from.id));
 
+bot.on("callback_query", async (ctx) => {
+  await ctx.answerCbQuery(); // ✅ WAJIB
+
+  const data = ctx.callbackQuery.data;
   // ===== USER =====
   if (data === "VIEW_PRODUCTS") return user.viewProducts(ctx);
   if (data.startsWith("VIEW_DETAIL_")) return user.viewProductDetail(ctx);
