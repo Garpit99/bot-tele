@@ -62,7 +62,6 @@ BTN_ADMIN_SET_GREETING:"💬 Ubah Greeting",
 BTN_ADMIN_SET_PAYMENT:"💳 Ubah Pembayaran",
 
 BTN_ADMIN_SET_CHAT_TEXT:"💬 Text Chat Admin",
-BTN_ADMIN_SET_VIDEO_TEXT:"🎥 Caption Video",
 
 BTN_ADMIN_UPLOAD_CHECKOUT_VIDEO:"🎬 Upload Video",
 BTN_ADMIN_DELETE_CHECKOUT_VIDEO:"🗑 Hapus Video"
