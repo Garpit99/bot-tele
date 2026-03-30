@@ -427,15 +427,15 @@ async function deleteCheckoutVideo(ctx){
   }
 }
 
-async function handleConfirmDeleteVideo(ctx){
+ async function handleConfirmDeleteVideo(ctx){
   try{
     console.log("🔴 Deleting video...")
-    const result = await settingsService.setSetting("help_checkout_video", "")
-    console.log("✅ Video deleted successfully:", result)
+    await settingsService.setSetting("help_checkout_video", "")
+    console.log("✅ Video deleted successfully")
     await ctx.reply("🗑 Video dihapus")
   }catch(e){
-    console.error("❌ Error deleting video:", e.message, e)
-    await ctx.reply("❌ Gagal menghapus video: " + (e.message || "Unknown error"))
+    console.error("❌ Error deleting video:", e.message)
+    await ctx.reply("❌ Gagal menghapus video")
   }
 }
 
@@ -444,7 +444,6 @@ async function handleCancelDeleteVideo(ctx){
     await ctx.reply("❌ Dibatalkan")
   }catch(e){
     console.error("Error canceling delete:", e)
-    await ctx.reply("❌ Gagal membatalkan")
   }
 }
 
