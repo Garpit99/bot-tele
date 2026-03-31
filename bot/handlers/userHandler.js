@@ -4,6 +4,7 @@ const { getClient } = require('../../db/database');
 const orderService = require('../../services/orderService');
 const buttonService = require('../../services/buttonService');
 const { Markup } = require('telegraf');
+const btnCache = {};
 
 const ADMIN_IDS = (process.env.ADMIN_IDS || '')
   .split(',')
