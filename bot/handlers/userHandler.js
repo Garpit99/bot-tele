@@ -22,8 +22,12 @@ async function getBtn(key) {
     BTN_HELP_VIDEO: "▶ Tonton Video Bantuan",
     BTN_HELP: "❓ Bantuan",
   };
+if (btnCache[key]) return btnCache[key]; // 🔥 cache
 
-  return (await buttonService.getButtonLabel(key)) || defaultButtons[key];
+  const val = await buttonService.getButtonLabel(key);
+  btnCache[key] = val || defaultButtons[key];
+
+  return btnCache[key];
 }
 
 module.exports = {
@@ -43,7 +47,7 @@ async start(ctx, isAdmin = false) {
 ============================ */
 async helpMenu(ctx) {
   try {
-    if (ctx.callbackQuery) await ctx.answerCbQuery();
+    if (ctx.callbackQuery) await ctx.answerCbQuery("Loading...").catch(() => {});
 
     const intro =
       (await settingsService.getSetting("help_intro")) ||
@@ -145,12 +149,14 @@ async showRandomHelpVideo(ctx) {
     if (!ids || !ids.length) return ctx.reply('📭 Belum ada produk tersedia.');
 
     const buttons = [];
-    for (const id of ids) {
-      const data = await client.hGetAll(`product:${id}`);
-      if (!data || !data.name) continue;
-      buttons.push([{ text: `🛍️ ${data.name}`, callback_data: `VIEW_DETAIL_${id}` }]);
-    }
-
+   const products = await Promise.all(
+  ids.map(id => client.hGetAll(`product:${id}`))
+);
+     products.forEach((data, i) => {
+  if (!data || !data.name) return;
+  const id = ids[i];
+  buttons.push([{ text: `🛍️ ${data.name}`, callback_data: `VIEW_DETAIL_${id}` }]);
+});
     await ctx.reply('🛒 Pilih produk untuk melihat detail:', {
       reply_markup: { inline_keyboard: buttons },
     });
@@ -160,26 +166,29 @@ async showRandomHelpVideo(ctx) {
        📖 PRODUCT DETAIL
   ============================ */
  async viewProductDetail(ctx) {
-  await ctx.answerCbQuery().catch(() => {});
+  await ctx.answerCbQuery("Loading...").catch(() => {});
     if (!ctx.session) ctx.session = {};
     const client = getClient();
     const id = ctx.callbackQuery.data.replace('VIEW_DETAIL_', '');
-    const data = await client.hGetAll(`product:${id}`);
+    const [data, randomLink, btnOpen, btnBuy, btnBack] = await Promise.all([
+  client.hGetAll(`product:${id}`),
+  client.sRandMember(`product_links:${id}`),
+  getBtn('BTN_OPEN_LINK'),
+  getBtn('BTN_BUY'),
+  getBtn('BTN_BACK'),
+]);
 
     if (!data || !data.id)
       return ctx.editMessageText('❌ Produk tidak ditemukan.');
 
-    const randomLink = await client.sRandMember(`product_links:${id}`);
-    ctx.session.lastProductLink = randomLink || null;
 
     const message = `🛍️ *${data.name}*\n💰 Harga: Rp${Number(data.price || 0).toLocaleString('id-ID')}\n📦 Stok: ${data.stock}\n📝 ${data.description || '-'}`;
 
     const buttons = [
-      [{ text: await getBtn('BTN_OPEN_LINK'), callback_data: `OPEN_LINK_${id}` }],
-      [{ text: await getBtn('BTN_BUY'), callback_data: `BUY_PRODUCT_${id}` }],
-      [{ text: await getBtn('BTN_BACK'), callback_data: 'VIEW_PRODUCTS' }],
-    ];
-
+  [{ text: btnOpen, callback_data: `OPEN_LINK_${id}` }],
+  [{ text: btnBuy, callback_data: `BUY_PRODUCT_${id}` }],
+  [{ text: btnBack, callback_data: 'VIEW_PRODUCTS' }],
+];
     try {
   await ctx.editMessageText(message, {
     parse_mode: 'Markdown',
@@ -200,19 +209,18 @@ async showRandomHelpVideo(ctx) {
 async openRandomLink(ctx) {
   try {
     // ✅ WAJIB: jawab SEGERA
-    await ctx.answerCbQuery().catch(() => {});
+    await ctx.answerCbQuery("Loading...").catch(() => {});
 
     if (!ctx.session) ctx.session = {};
     const client = getClient();
     const id = ctx.callbackQuery.data.replace('OPEN_LINK_', '');
 
-    const randomLink = await client.sRandMember(`product_links:${id}`);
-    if (!randomLink) {
-      return ctx.reply('❌ Tidak ada link untuk produk ini.');
-    }
-
-    const data = await client.hGetAll(`product:${id}`);
-
+    const [randomLink, data, btnOpen, btnBack] = await Promise.all([
+  client.sRandMember(`product_links:${id}`),
+  client.hGetAll(`product:${id}`),
+  getBtn('BTN_OPEN_LINK'),
+  getBtn('BTN_BACK'),
+]);
     const newText =
       `🛍️ *${data.name}*\n` +
       `💰 Harga: Rp${Number(data.price || 0).toLocaleString('id-ID')}\n` +
