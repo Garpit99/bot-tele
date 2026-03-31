@@ -15,12 +15,23 @@ app.get('/', (req, res) => {
   res.status(200).send('✅ Bot is running');
 });
 
-// ===== INIT =====
 async function init() {
   try {
-    // ===== DB CONNECT =====
     await connect();
     console.log('✅ Database connected');
+
+    // 🔥 REDIS KEEP ALIVE (PINDAH KE SINI, DI LUAR IF)
+    setInterval(async () => {
+      try {
+        const client = require('./db/database').getClient();
+        if (client) {
+          await client.ping();
+          console.log('🏓 Redis ping');
+        }
+      } catch (e) {
+        console.log('⚠️ Redis ping gagal');
+      }
+    }, 30000);
 
     const webhookPath = '/telegram/webhook';
     const webhookFull = process.env.WEBHOOK_URL
@@ -28,6 +39,36 @@ async function init() {
       : null;
 
     if (webhookFull) {
+      // ✅ CEK DULU, JANGAN SPAM
+      const info = await bot.telegram.getWebhookInfo();
+
+      if (info.url !== webhookFull) {
+        console.log("🔄 Setting webhook...");
+        await bot.telegram.setWebhook(webhookFull);
+      } else {
+        console.log("✅ Webhook sudah sama");
+      }
+
+      app.use(bot.webhookCallback(webhookPath));
+
+      console.log('🌐 Webhook mode aktif');
+      console.log(`➡️ ${webhookFull}`);
+    } else {
+      await bot.telegram.deleteWebhook().catch(() => {});
+      await bot.launch();
+
+      console.log('🤖 Bot running (polling mode)');
+    }
+
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+    });
+
+  } catch (err) {
+    console.error('❌ INIT ERROR:', err);
+    process.exit(1);
+  }
+}
       // ===== WEBHOOK MODE =====
       await bot.telegram.deleteWebhook().catch(() => {});
       await bot.telegram.setWebhook(webhookFull);
