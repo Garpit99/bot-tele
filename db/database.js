@@ -1,4 +1,3 @@
-// db/database.js
 const { createClient } = require('redis');
 
 let client;
@@ -6,14 +5,13 @@ let client;
 async function connect() {
   if (client) return client;
 
-  console.log('✅ Redis connecting...');
+  console.log('🟡 Redis connecting...');
 
-  // Ambil URL Redis dari environment atau fallback default
   let redisUrl =
     process.env.REDIS_URL ||
     'rediss://default:YOUR_PASSWORD@YOUR_HOST.leapcell.cloud:6379';
 
-  // Encode password agar simbol tidak merusak URL
+  // encode password aman
   if (redisUrl.includes('@')) {
     const parts = redisUrl.split('@');
     const auth = parts[0].replace('rediss://', '');
@@ -24,29 +22,52 @@ async function connect() {
 
   const isSecure = redisUrl.startsWith('rediss://');
 
-  try {
-    client = createClient({
-      url: redisUrl,
-      socket: isSecure
-        ? { tls: true, rejectUnauthorized: false }
-        : {},
-    });
+  client = createClient({
+    url: redisUrl,
 
-    client.on('error', (err) => console.error('❌ Redis Client Error:', err));
-    client.on('ready', () => console.log('✅ Redis ready!'));
+    socket: {
+      tls: isSecure,
+      rejectUnauthorized: false,
 
-    await client.connect();
-    console.log('🚀 Redis connected successfully');
+      // 🔥 AUTO RECONNECT (INI KUNCI)
+      reconnectStrategy: (retries) => {
+        console.log(`🔁 Redis reconnect attempt ${retries}`);
+        return Math.min(retries * 200, 3000); // max delay 3 detik
+      },
 
-    return client;
-  } catch (err) {
-    console.error('❌ Initialization failed:', err);
-    throw err;
-  }
+      keepAlive: 5000,
+    },
+  });
+
+  // ===== EVENTS =====
+  client.on('error', (err) => {
+    console.error('❌ Redis Error:', err.message);
+  });
+
+  client.on('connect', () => {
+    console.log('🟡 Redis connecting...');
+  });
+
+  client.on('ready', () => {
+    console.log('✅ Redis ready!');
+  });
+
+  client.on('end', () => {
+    console.log('🔴 Redis disconnected');
+    client = null; // 🔥 reset supaya bisa reconnect
+  });
+
+  await client.connect();
+
+  return client;
 }
 
+// 🔥 JANGAN CRASH BOT
 function getClient() {
-  if (!client) throw new Error('❌ Redis client belum terhubung! Panggil connect() dulu.');
+  if (!client) {
+    console.warn('⚠️ Redis belum connect, mencoba reconnect...');
+    return null;
+  }
   return client;
 }
 
