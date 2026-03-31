@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const { connect } = require('./db/database');
-const bot = require('./bot/index'); // ✅ FIX PATH
+const bot = require('./bot/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,7 +10,6 @@ const HOST = '0.0.0.0';
 
 app.use(bodyParser.json());
 
-// ===== HEALTH CHECK =====
 app.get('/', (req, res) => {
   res.status(200).send('✅ Bot is running');
 });
@@ -20,7 +19,7 @@ async function init() {
     await connect();
     console.log('✅ Database connected');
 
-    // 🔥 REDIS KEEP ALIVE (PINDAH KE SINI, DI LUAR IF)
+    // ✅ REDIS KEEP ALIVE
     setInterval(async () => {
       try {
         const client = require('./db/database').getClient();
@@ -28,7 +27,7 @@ async function init() {
           await client.ping();
           console.log('🏓 Redis ping');
         }
-      } catch (e) {
+      } catch {
         console.log('⚠️ Redis ping gagal');
       }
     }, 30000);
@@ -39,7 +38,6 @@ async function init() {
       : null;
 
     if (webhookFull) {
-      // ✅ CEK DULU, JANGAN SPAM
       const info = await bot.telegram.getWebhookInfo();
 
       if (info.url !== webhookFull) {
@@ -69,36 +67,10 @@ async function init() {
     process.exit(1);
   }
 }
-      // ===== WEBHOOK MODE =====
-      await bot.telegram.deleteWebhook().catch(() => {});
-      await bot.telegram.setWebhook(webhookFull);
-
-      app.use(bot.webhookCallback(webhookPath));
-
-      console.log('🌐 Webhook mode aktif');
-      console.log(`➡️ ${webhookFull}`);
-    } else {
-      // ===== POLLING MODE =====
-      await bot.telegram.deleteWebhook().catch(() => {});
-      await bot.launch();
-
-      console.log('🤖 Bot running (polling mode)');
-    }
-
-    // ===== START SERVER =====
-    app.listen(PORT, HOST, () => {
-      console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-    });
-
-  } catch (err) {
-    console.error('❌ INIT ERROR:', err);
-    process.exit(1);
-  }
-}
 
 init();
 
-// ===== GLOBAL ERROR HANDLER =====
+// ERROR HANDLER
 process.on('uncaughtException', (err) => {
   console.error('🔥 Uncaught Exception:', err);
 });
@@ -107,6 +79,5 @@ process.on('unhandledRejection', (err) => {
   console.error('🔥 Unhandled Rejection:', err);
 });
 
-// ===== SHUTDOWN =====
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
